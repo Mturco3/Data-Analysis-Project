@@ -1,0 +1,38 @@
+---
+title: "Data Analysis for Business Project"
+author: "Michele Turco"
+date: "2024-04-09"
+output: html_document
+---
+
+# Introduction
+
+The dataset contains information about bank customers. The goal is to predict whether a customer will close his credit card account, in that case the bank may try to propose more convenient services and prevent the client from leaving the bank.
+
+# Setup
+
+All the libraries we used
+
+# Data Import
+
+```{r}
+Data = read.csv2("./Dataset/bank_accounts_train.csv", 
+                 header = T, 
+                 sep = ",", 
+                 colClasses = "character")
+
+```
+
+
+This is a paragraph in an R Markdown document.
+
+Below is a code chunk:
+
+```{r}
+fit = lm(dist ~ speed, data = cars)
+b   = coef(fit)
+plot(cars)
+abline(fit)
+```
+
+The slope of the regression is `r b[1]`.

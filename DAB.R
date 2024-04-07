@@ -10,6 +10,28 @@ Data = read.csv2("./Dataset/bank_accounts_train.csv",
 
 #1
 
+str(Data)
+
+Data$CLIENTNUM = NULL # We drop the first line since it is a pure identifier and it has nothing to do with our analysis
+
+variables = colnames(Data) # With this line we have a vector of our variables
+
+categorical_variables <- c("Gender", "Education_Level", "Marital_Status", "Card_Category")
+
+
+numerical_variables <- setdiff(variables, categorical_variables) # Setdiff is a function that finds the difference between the two argument sets
+
+for (var in numerical_variables) {
+  Data[[var]] = as.numeric(Data[[var]])
+}
+
+for (var in categorical_variables) {
+  Data[[var]] = as.factor(Data[[var]])
+}
+
+str(Data)
+
+
 # Pre-processing
 colnames(Data)
 
