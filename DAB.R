@@ -1,3 +1,4 @@
+#edo
 #MICHELE TURCO, EDOARDO BROWN, GIULIO PRESAGHI, IRENE BENVENUTI
 
 Data = read.csv2("C:/Users/Thebrickster21/Desktop/DataAnalProject/bank_accounts_train.csv", 
