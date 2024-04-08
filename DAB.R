@@ -1,4 +1,3 @@
-#edo
 #MICHELE TURCO, EDOARDO BROWN, GIULIO PRESAGHI, IRENE BENVENUTI
 
 Data = read.csv2("./Dataset/bank_accounts_train.csv", 
@@ -18,7 +17,6 @@ variables = colnames(Data) # With this line we have a vector of our variables
 
 categorical_variables <- c("Gender", "Education_Level", "Marital_Status", "Card_Category")
 
-
 numerical_variables <- setdiff(variables, categorical_variables) # Setdiff is a function that finds the difference between the two argument sets
 
 for (var in numerical_variables) {
@@ -31,7 +29,8 @@ for (var in categorical_variables) {
 
 str(Data)
 
-numerical_variables <- setdiff(numerical_variables, "Closed_Account")
+target_variable = "Closed_Account"
+numerical_variables <- setdiff(numerical_variables, target_variable)
 
 # Plots categorical variables
 
@@ -188,7 +187,6 @@ print(na_counts_per_column)
 # Missing values are only present in "Marital Status" and "Educational Level". 
 
 
-
 #We decided to impute missing values with the mode of the other instances
 #in the same column
 
@@ -200,13 +198,53 @@ getSimpleMode <- function(x) {
 }
 
 
-categorical_vars <- c("Gender", "Education_Level", "Marital_Status", "Card_Category")  # Your categorical variables
-
-for (var in categorical_vars) {
+for (var in categorical_variables) {
   if (any(is.na(Data[[var]]))) {
     Data[[var]][is.na(Data[[var]])] <- getSimpleMode(Data[[var]])
   }
 }
+
+dev.off() # empty plot
+
+str(Data)
+na_matrix <- is.na(Data)
+# Count how many rows have at least one NA
+na_counts_per_row <- rowSums(na_matrix)
+rows_with_na <- sum(na_counts_per_row > 0)
+
+# Print the result
+print(rows_with_na)
+
+## --------------------------------------------- ##
+# Correlation Matrix
+
+# Compute the correlation matrix
+cor_matrix <- cor(Numerical_Data, use = "complete.obs")  # 'use' handles missing values
+
+corrplot(cor_matrix, method = "color", tl.srt = 45, tl.col = "black") # Using the library corrplot
+
+
+# Correlation with target variable
+correlations <- sapply(Numerical_Data, function(x) cor(x, Data$Closed_Account, use = "complete.obs"))
+
+# Omit the target variable from the plot if it's included in the Data frame
+correlations <- abs(correlations[names(correlations) != "target_var"])
+
+# Plot
+# Increase the size of the margins on the left side (side = 2)
+par(mar = c(5, 8, 4, 2) + 0.1)  # Default is c(5, 4, 4, 2) + 0.1
+
+# Create the barplot with larger font size for names
+barplot(correlations, main="Correlation with Target Variable",
+        horiz=TRUE, cex.names=0.7, las=2, col = "deepskyblue")
+
+# Reset to default par settings if necessary
+par(mar = c(5, 4, 4, 2) + 0.1)
+
+
+
+
+
 
 # View the cleaned data
 head(Data)
@@ -228,74 +266,84 @@ numerical_vars <- c("Customer_Age", "Dependent_count", "Months_on_book", "Total_
 cor_matrix <- cor(Data[numerical_vars], use="complete.obs") # handling NA values
 
 # Visualize the correlation matrix
-install.packages("corrplot")
-library(corrplot)
 corrplot(cor_matrix, method="circle")
 
-install.packages("ggplot2")
-library(ggplot2)
+## Logistic regression
 
-#Visualizing Credit Limit across different Card Categories
-ggplot(Data, aes(x="Card_Category", y="Credit_Limit")) + 
-  geom_boxplot() +
-  theme_minimal() +
-  labs(title="Credit Limit by Card Category", x="Card_Category", y="Credit_Limit")
-    
+set.seed(123)
+id_train <- sample(1:nrow(Data), size = 0.75*nrow(Data), replace = F)
+train_data <- Data[id_train,]
+val_data <- Data[-id_train,]
 
-#### b. Scatter Plots for Numerical Variable Relations
+# Response variable distribution in the train test
+plot(train_data$Closed_Account, ylab = "Frequency")
+table(train_data$Closed_Account)
+prop.table(table(train_data$Closed_Account))
 
-#Relationship between Total Trans Amt and Total Trans Ct
-ggplot(Data, aes(x="Total_Trans_Amt", y="Total_Trans_Ct")) +
-  geom_point(alpha=0.5) +  # Alpha for transparency if many points overlap
-  theme_minimal() +
-  labs(title="Transaction Amount vs. Transaction Count", x="Total_Transaction_Amount", y="Total_Transaction_Count")
+# Response variable distribution in the original data
+plot(Data$Closed_Account, ylab = "Frequency")
+table(Data$Closed_Account)
+prop.table(table(Data$Closed_Account))
 
-
-#### c. Histograms for Variable Distributions
-
-# Histogram of Customer Age
-ggplot(Data, aes(x="Customer_Age")) + 
-  geom_histogram(binwidth=5, fill="blue", color="black") +
-  theme_minimal() +
-  labs(title="Distribution of Customer Age", x="Customer_Age", y="Frequency")
-
-#LOGISTIC REGRESSION, K-NN
-
-# Use 70% of dataset as training set and 30% as testing set
-sample <- sample(c(TRUE, FALSE), nrow(Data), replace = TRUE, prob = c(0.7, 0.3))
-train <- Data[sample, ]
-test <- Data[!sample, ]
+# Response variable distribution in the validation set
+plot(val_data$Closed_Account, ylab = "Frequency")
+table(val_data$Closed_Account)
+prop.table(table(val_data$Closed_Account))
 
 # Fit logistic regression model
-model <- glm(train$Closed_Account ~ train$Income + train$Gender, family = binomial(link = "logit"), data = train)
+model <- glm(Closed_Account ~ Income + Gender, family = binomial(link = "logit"), data = train_data)
 # View model summary
 summary(model)
+
+baseline <- glm(Closed_Account ~ 1, family = "binomial", data = train_data)
+anova(logit_fit0, model, test = "Chisq")
+
+#Now let's see how much it is accurate using the validation set
+val_data$predicted_probabilities <- predict(model, newdata = val_data, type="response")
+
+# Assuming your threshold is 0.5 for classifying predictions as 1
+val_data$predicted_class <- ifelse(val_data$predicted_probabilities > 0.5, 1, 0)
+
+
+# Create the confusion matrix by comparing actual values to predicted classes
+conf_matrix <- table(Actual = val_data$Closed_Account, Predicted = val_data$predicted_class)
+print(conf_matrix)
+
+
+#Now let's show the probabilities on some plots
+ggplot(val_data, aes(x = Income, y = predictions, color = Gender)) + 
+  geom_line() + 
+  labs(title = "Probability of Account Closure by Income and Gender", y = "Probability of Closure", x = "Income") +
+  scale_color_manual(values = c("blue", "red"))
+
+#From the logistic regression lines we can infere that income has not a different effect on males and females.
+#Instead we can see that the Gender difference has a significant effect on the probability of Account Closure.
 
 #K-NN
 
 library(class)
 
-# Initialize an empty vector to store scores
-scores <- numeric()
+# Set a range for k
+k_values <- 1:20
+accuracy_scores <- numeric(length(k_values))
 
-# Vary k and evaluate model performance
-for (k in 1:20) {
-  # Fit k-NN model using training data
-  knn_model <- knn(train[, c("Total_Trans_Amt", "Total_Trans_Ct")],
-                   test[, c("Total_Trans_Amt", "Total_Trans_Ct")],
-                   train$Closed_Account, k = k)
+# Loop over k values
+for (k in k_values) {
+  set.seed(123) # for reproducibility
+  knn_pred <- knn(train = train_data[, c("Total_Trans_Amt", "Total_Trans_Ct")],
+                  test = val_data[, c("Total_Trans_Amt", "Total_Trans_Ct")],
+                  cl = train_data$Closed_Account,
+                  k = k)
   
-  # Calculate performance metric (e.g., accuracy)
-  accuracy <- sum(knn_model == test$Closed_Account) / nrow(test)
-  
-  # Store the score
-  scores <- c(scores, accuracy)
+  # Calculate accuracy
+  accuracy_scores[k] <- sum(val_data$Closed_Account == knn_pred) / length(knn_pred)
 }
 
-# Plot scores vs. k
-ggplot(data.frame(k = 1:20, score = scores), aes(x = k, y = score)) +
-  geom_line() +
-  labs(x = "Number of Neighbors (k)", y = "Test Accuracy",
-       title = "Test Accuracy for some k for k-NN")
+# Now, plot the accuracy scores as a function of k
+plot(k_values, accuracy_scores, type = "b", 
+     xlab = "Number of Neighbors (k)", ylab = "Accuracy",
+     main = "k-NN Model Accuracy by Number of Neighbors")
+
+
 
 
