@@ -31,35 +31,163 @@ for (var in categorical_variables) {
 
 str(Data)
 
+numerical_variables <- setdiff(numerical_variables, "Closed_Account")
 
-# Pre-processing
-colnames(Data)
+# Plots categorical variables
 
-Data$CLIENTNUM = as.numeric(Data$CLIENTNUM)
-Data$Customer_Age = as.numeric(Data$Customer_Age)
-Data$Gender = as.factor(Data$Gender)
-Data$Dependent_count = as.numeric(Data$Dependent_count)
-Data$Education_Level = as.factor(Data$Education_Level)
-Data$Marital_Status = as.factor(Data$Marital_Status)
-Data$Card_Category = as.factor(Data$Card_Category)
-Data$Months_on_book = as.numeric(Data$Months_on_book)
-Data$Total_Relationship_Count = as.numeric(Data$Total_Relationship_Count)
-Data$Months_Inactive_12_mon = as.numeric(Data$Months_Inactive_12_mon)
-Data$Contacts_Count_12_mon = as.numeric(Data$Contacts_Count_12_mon)
-Data$Credit_Limit = as.numeric(Data$Credit_Limit)
-Data$Total_Revolving_Bal = as.numeric(Data$Total_Revolving_Bal)
-Data$Avg_Open_To_Buy = as.numeric(Data$Avg_Open_To_Buy)
-Data$Total_Amt_Chng_Q4_Q1 = as.numeric(Data$Total_Amt_Chng_Q4_Q1)
-Data$Total_Trans_Amt = as.numeric(Data$Total_Trans_Amt)
-Data$Total_Trans_Ct = as.numeric(Data$Total_Trans_Ct)
-Data$Total_Ct_Chng_Q4_Q1 = as.numeric(Data$Total_Ct_Chng_Q4_Q1)
-Data$Avg_Utilization_Ratio = as.numeric(Data$Avg_Utilization_Ratio)
-Data$Income = as.numeric(Data$Income)
-Data$Closed_Account = as.numeric(Data$Closed_Account)
+# Gender
+x = table(Data$Gender)
+r = round(x/nrow(Data)*100, 2)
+s = paste( r, "%", sep = "")
+pie(table(Data$Gender))
+{pie(x = table(Data$Gender), 
+     labels = s,
+     edges = 10000, 
+     radius = 1,
+     init.angle = 90, 
+     col = c(rgb(1,0,0, .5),
+             rgb(0,0,1,0.5)),
+     cex = 2)
+  mtext("Gender", side = 3, cex = 2)
+  legend("topright", 
+         pch = 15, 
+         col = c(rgb(1,0,0, .5),
+                 rgb(0,0,1,0.5)),
+         c("Female", "Male"), cex = 1.7,
+         bty = "n")}
+
+#Marital Status
+x <- table(addNA(Data$Marital_Status))
+r = round(x/nrow(Data)*100, 2)
+s = paste( r, "%", sep = "")
+pie(table(Data$Marital_Status))
+{pie(x = table(Data$Marital_Status), 
+     labels = s,
+     edges = 10000, 
+     radius = 1,
+     init.angle = 90, 
+     col = c(rgb(1,0,0,0.5),
+             rgb(0,0,1,0.5),
+             rgb(0,0,0.5,1),
+             rgb(1,0.5,1,1)
+             ),
+     cex = 1)
+  mtext("Marital Status", side = 3, cex = 1.5, line = 1)
+  legend("topright", 
+         pch = 15, 
+         col = c(rgb(1,0,0, .5),
+                 rgb(0,0,1,0.5),
+                 rgb(0,0, .5,1),
+                 rgb(1,0.5,1,1)
+                 ),
+         c("Married", "Single", "Divorced", "Unknown"), cex = 1,
+         bty = "n")}
+
+#Educational Level
+education_table <- table(Data$Education_Level)
+r <- round(education_table / nrow(Data) * 100, 2)
+s <- paste(r, "%", sep = "")
+
+pie(x = education_table, 
+    labels = s,
+    edges = 10000, 
+    radius = 1,
+    init.angle = 90, 
+    col = c(rgb(1,0,0,0.5),
+            rgb(0,0,1,0.5),
+            rgb(0,0,0.5,1),
+            rgb(0.5,0.5,0,1),
+            rgb(0.3,0,0.5,0.8),
+            rgb(1,0.8,0,0.5),
+            rgb(1,0.5,1,1)),
+    cex = 1)
+mtext("Education Level", side = 3, cex = 1.5, line = 1) # side=3 is the top
+legend("topleft", 
+       pch = 15, 
+       col = c(rgb(1,0,0,0.5),
+               rgb(0,0,1,0.5),
+               rgb(0,0,0.5,1),
+               rgb(0.5,0.5,0,1),
+               rgb(0.3,0,0.5,0.8),
+               rgb(1,0.8,0,0.5),
+               rgb(1,0.5,1,1)),
+       legend = levels(Data$Education_Level), cex = 1,
+       bty = "n")
+
+# Card Category
+card_table <- table(Data$Card_Category)
+r <- round(card_table / nrow(Data) * 100, 2)
+s <- paste(r, "%", sep = "")
+s2 <- paste(levels(Data$Card_Category), s)
+
+pie(x = card_table, 
+    edges = 10000, 
+    radius = 1,
+    init.angle = 90, 
+    col = c(rgb(1,0,0,0.5),
+            rgb(0,0,1,0.5),
+            rgb(0,0,0.5,1),
+            rgb(0.5,0.5,0,1)
+            ),
+    cex = 1)
+mtext("Card Category", side = 3, cex = 1.5, line = 1) # side=3 is the top
+legend( x= -2.4, y = 1,
+       pch = 15, 
+       col = c(rgb(1,0,0,0.5),
+               rgb(0,0,1,0.5),
+               rgb(0,0,0.5,1),
+               rgb(0.5,0.5,0,1)
+               ),
+       legend = s2, cex = 1,
+       bty = "n")
+
+# Graphical exploration of Numerical Variables
+Numerical_Data = Data[numerical_variables]
+(means_vec = apply(X = Numerical_Data, MARGIN = 2, FUN = mean))
+colMeans(Numerical_Data)
+(median_vec = apply(X = Numerical_Data, MARGIN = 2, FUN = median))
+(sd_vec = apply(X = Numerical_Data, MARGIN = 2, FUN = sd))
+
+ncol(Numerical_Data)
+par(mfrow = c(3,3), mar = c(2,4,4,1))
+
+for(i in 1:length(numerical_variables)){
+  hist(Numerical_Data[,i], freq = F, main = names(Numerical_Data)[i],col = rgb(.7,.7,.7), border = "white", xlab = "")
+  abline(v = means_vec[i], lwd = 2)
+  abline(v = median_vec[i], lwd = 2, col = rgb(.7,0,0))
+  legend("top", c("Mean", "Median"), lwd = 2, col = c(1, rgb(.7,0,0)),cex = .8, bty = "n")
+}
 
 #Encode NaN values
 #Rename missing values with NA notation
 Data[Data == 'Unknown'] <- NA
+
+# Now we try to understand where the missing values are
+
+# Create a logical matrix where TRUE indicates a missing value
+na_matrix <- is.na(Data)
+
+# Sum the TRUE values by row to see how many NAs each row contains
+na_counts_per_row <- rowSums(na_matrix)
+
+# Count how many rows have at least one NA
+rows_with_na <- sum(na_counts_per_row > 0)
+
+# Print the result
+print(rows_with_na)
+
+# Since there is a significant number of rows with missing values, dropping them is not an
+# optimal solution
+
+# Count NAs in each column
+na_counts_per_column <- colSums(is.na(Data))
+
+# Print the result
+print(na_counts_per_column)
+
+# Missing values are only present in "Marital Status" and "Educational Level". 
+
+
 
 #We decided to impute missing values with the mode of the other instances
 #in the same column
