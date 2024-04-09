@@ -11,7 +11,13 @@ The dataset contains information about bank customers. The goal is to predict wh
 
 # Setup
 
-All the libraries we used
+In order to run all the chunks below, the following libraries need to be imported. However, for the sake of simplicity, the code is not displayed in the generated pdf file.
+
+```{r}
+library(ggplot2)
+library(corrplot)
+
+```
 
 # Data Import
 
@@ -54,12 +60,249 @@ for (var in categorical_variables) {
 Data$Closed_Account = as.factor(Data$Closed_Account)
 
 str(Data)
+Data_n = Data[numerical_variables]
+```
+
+# EDA
+
+## Categorical Variables exploration
+
+### Gender
+```{r}
+x = table(Data$Gender)
+r = round(x/nrow(Data)*100, 2)
+s = paste( r, "%", sep = "")
+{pie(x = table(Data$Gender), 
+     labels = s,
+     edges = 10000, 
+     radius = 1,
+     init.angle = 90, 
+     col = c(rgb(1,0,0, .5),
+             rgb(0,0,1,0.5)),
+     cex = 2)
+  mtext("Gender", side = 3, cex = 2)
+  legend("topright", 
+         pch = 15, 
+         col = c(rgb(1,0,0, .5),
+                 rgb(0,0,1,0.5)),
+         c("Female", "Male"), cex = 1.7,
+         bty = "n")}
+
+#For Gender we analyze some relations 
+
+##Gender-Income
+ggplot(Data, aes(x = Gender, y = Income, color = Gender)) +
+  geom_boxplot() +
+  xlab("Gender") +
+  ylab("Income") +
+  scale_color_manual(values = c("F" = "pink", "M" = "blue"))
+
+##Gender-Customer_Age
+ggplot(Data, aes(x = Gender, y = Customer_Age, color = Gender)) +
+  geom_boxplot() +
+  xlab("Gender") +
+  ylab("Customer_Age") +
+  scale_color_manual(values = c("F" = "pink", "M" = "blue"))
+
+##Gender-Months_On_Book
+ggplot(Data, aes(x = Gender, y = Months_on_book, fill = Gender)) +
+  geom_violin(trim = FALSE, color = "black", alpha = 0.8) +  # Add black outline and reduce transparency
+  scale_fill_manual(values = c("#FF9999", "#66CCFF", "#FFFF99", "#99FF99")) +  # Custom fill colors
+  labs(
+    title = "Distribution of Months on Book by Marital Status",
+    x = "Marital Status",
+    y = "Months on Book"
+  )
+
+##Gender-Closed_Account
+#Let's adjust the dimensions of the legend
+smaller_text_theme <- theme_minimal() +
+  theme(legend.position = "bottom",
+        legend.text = element_text(size = 8),
+        axis.text = element_text(size = 8),
+        axis.title = element_text(size = 10),
+        plot.title = element_text(size = 12),
+        strip.text.x = element_text(size = 10))
+
+ggplot(Data, aes(x = Gender, fill = as.factor(Closed_Account))) +
+  geom_bar(position = "fill") +
+  scale_fill_manual(values = c("0" = "lightgreen", "1" = "#FFFF99"), labels = c("Account Open", "Account Closed"), name = "") +
+  labs(title = "Proportion of Closed Account By Gender", x = "Gender", y = "Proportion") +
+  smaller_text_theme
+```
+
+```{r}
+#MARITAL STATUS
+x <- table(addNA(Data$Marital_Status))
+r = round(x/nrow(Data)*100, 2)
+s = paste( r, "%", sep = "")
+{pie(x = table(Data$Marital_Status), 
+     labels = s,
+     edges = 10000, 
+     radius = 1,
+     init.angle = 90, 
+     col = c(rgb(1,0,0,0.5),
+             rgb(0,0,1,0.5),
+             rgb(0,0,0.5,1)
+     ),
+     cex = 1)
+  mtext("Marital Status", side = 3, cex = 1.5, line = 1)
+  legend("topright", 
+         pch = 15, 
+         col = c(rgb(1,0,0, .5),
+                 rgb(0,0,1,0.5),
+                 rgb(0,0, .5,1)
+         ),
+         c("Married", "Single", "Divorced"), cex = 1,
+         bty = "n")}
+
+#For Marital_Status we analyze some relations with numerical variables
+
+##Marital_Status-Months_On_Book
+ggplot(Data, aes(x = Marital_Status, y = Months_on_book, fill = Marital_Status)) +
+  geom_violin(trim = FALSE, color = "black", alpha = 0.8) +  # Add black outline and reduce transparency
+  scale_fill_manual(values = c("#FF9999", "#66CCFF", "#FFFF99", "#99FF99")) +  # Custom fill colors
+  labs(
+    title = "Distribution of Months on Book by Marital Status",
+    x = "Marital Status",
+    y = "Months on Book"
+  )
+
+##Marital_Status-Credit_Limit
+ggplot(Data, aes(x = Marital_Status, y = Credit_Limit, fill = Marital_Status)) +
+  geom_bar(stat = "identity", width = 0.7) +  # Set width of the bars
+  labs(
+    title = "Bar Plot Example",  # Title of the plot
+    x = "Marital_Status",  # Label for the x-axis
+    y = "Credit_Limit"  # Label for the y-axis
+  ) +
+  theme_minimal() +  # Use minimal theme
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1)  # Rotate x-axis labels for better readability
+  ) +
+  scale_fill_manual(values = c("lightpink", "lightblue", "#FFFF99", "lightgreen"))  # Custom fill colors
+
+##Marital_Status-Closed_Account
+
+ggplot(Data, aes(x = Marital_Status, fill = as.factor(Closed_Account))) +
+  geom_bar(position = "fill") +
+  scale_fill_manual(values = c("0" = "lightgreen", "1" = "#FFFF99"), labels = c("Account Open", "Account Closed"), name = "") +
+  labs(title = "Proportion of Closed Accounts by Marital_Status", x = "Income Bin", y = "Proportion") +
+  smaller_text_theme
+```
+
+```{r}
+#EDUCATION LEVEL
+education_table <- table(Data$Education_Level)
+r <- round(education_table / nrow(Data) * 100, 2)
+s <- paste(r, "%", sep = "")
+
+pie(x = education_table, 
+    labels = s,
+    edges = 10000, 
+    radius = 1,
+    init.angle = 90, 
+    col = c(rgb(1,0,0,0.5),
+            rgb(0,0,1,0.5),
+            rgb(0,0,0.5,1),
+            rgb(0.5,0.5,0,1),
+            rgb(0.3,0,0.5,0.8),
+            rgb(1,0.8,0,0.5)),
+    cex = 1)
+mtext("Education Level", side = 3, cex = 1.5, line = 1) # side=3 is the top
+legend("topleft", 
+       pch = 15, 
+       col = c(rgb(1,0,0,0.5),
+               rgb(0,0,1,0.5),
+               rgb(0,0,0.5,1),
+               rgb(0.5,0.5,0,1),
+               rgb(0.3,0,0.5,0.8),
+               rgb(1,0.8,0,0.5)),
+       legend = levels(Data$Education_Level), cex = 1,
+       bty = "n")
+
+#For Education_Level we analyze some relations with numerical variables
+
+##Education_Level-Credit_Limit
+ggplot(Data, aes(x = Education_Level, y = Credit_Limit, fill = Education_Level)) +
+  geom_bar(stat = "identity", width = 0.7) +  # Set width of the bars
+  labs(
+    title = "Credit Limit for each Educational Level",  # Title of the plot
+    x = "Education_Level",  # Label for the x-axis
+    y = "Credit_Limit"  # Label for the y-axis
+  ) +
+  theme_minimal() +  # Use minimal theme
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1)  # Rotate x-axis labels for better readability
+  ) +
+  scale_fill_manual(values = c("lightpink", "lightblue", "#FFFF99", "lightgreen", "brown", "violet"))
+
+##Education_Level-Closed_Account
+
+ggplot(Data, aes(x = Education_Level, fill = as.factor(Closed_Account))) +
+  geom_bar(position = "fill") +
+  scale_fill_manual(values = c("0" = "lightgreen", "1" = "#FFFF99"), labels = c("Account Open", "Account Closed"), name = "") +
+  labs(title = "Proportion of Closed Accounts by Education_Level", x = "Education_Level", y = "Proportion") +
+  smaller_text_theme
+```
+
+```{r}
+
+# Card Category
+card_table <- table(Data$Card_Category)
+r <- round(card_table / nrow(Data) * 100, 2)
+s <- paste(r, "%", sep = "")
+s2 <- paste(levels(Data$Card_Category), s)
+
+pie(x = card_table, 
+    edges = 10000, 
+    radius = 1,
+    init.angle = 90, 
+    col = c(rgb(1,0,0,0.5),
+            rgb(0,0,1,0.5),
+            rgb(0,0,0.5,1),
+            rgb(0.5,0.5,0,1)
+    ),
+    cex = 1)
+mtext("Card Category", side = 3, cex = 1.5, line = 1) # side=3 is the top
+legend( x= -2.4, y = 1,
+        pch = 15, 
+        col = c(rgb(1,0,0,0.5),
+                rgb(0,0,1,0.5),
+                rgb(0,0,0.5,1),
+                rgb(0.5,0.5,0,1)
+        ),
+        legend = s2, cex = 1,
+        bty = "n")
+
+#For Card_Category we analyze some relations with numerical variables
+
+##Card_Category-Customer_Age
+ggplot(Data, aes(x = Card_Category, fill = as.factor(Closed_Account))) +
+  geom_bar(position = "fill") +
+  scale_fill_manual(values = c("0" = "lightgreen", "1" = "#FFFF99"), labels = c("Account Open", "Account Closed"), name = "") +
+  labs(title = "Proportion of Closed Accounts by Card_Category", x = "Card_Category", y = "Proportion") +
+  smaller_text_theme
 
 ```
 
-# Data Exploration
+## Correlation Matrix
 
-# Dealing with NULL values
+In the following chunk, we analyzed the correlation between numerical variables plotting a correlation matrix.
+
+```{r}
+
+
+cor_matrix <- cor(Data[numerical_variables], use="complete.obs")
+corrplot(cor_matrix, method = "color", tl.srt = 45, tl.col = "black") 
+
+
+
+```
+
+From the correlation matrix we can clearly see some relevant correlations that make us think of a possible deletion. In particular we are searching for variables that are highly correlated so that we can discard one of them in order to avoid multicollinearity. It is worth to considering the relation between "Months_on_Book" and "Customer_Age","Total_Trans_Ct" and "Total_Trans_Amt", "Credit_Limit" and "Avg_Open_to_Buy". The most relevant one is the relation between "Credit_Limit" and "Avg_Open_to_Buy".However, we will just take into account these findings without any further modification to the original dataset.
+
+# Dealing with unknown values
 
 ```{r}
 
@@ -116,10 +359,45 @@ rows_with_na <- sum(na_counts_per_row > 0)
 print(rows_with_na)
 
 ```
+# 3 Logistic Regression Model to estimate effects of Income and Gender on Closed_Account
+
+In the first place, we fit the model to the data and we consider the summary of the model.
+```{r}
+
+# Fit logistic regression model
+set.seed(1)
+gender_income_model <- glm(Closed_Account ~ Income * Gender, family = binomial(link = "logit"), data = Data)
+
+# View model summary
+summary(gender_income_model)
+
+```
+
+Comment the results obtained in the summary:
+
+We then proceed by plotting the regression lines
+
+```{r}
+ggplot(val_data, aes(x = Income, y = predictions, color = Gender)) + 
+  geom_line() + 
+  labs(title = "Probability of Account Closure by Income and Gender", y = "Probability of Closure", x = "Income") +
+  scale_color_manual(values = c("blue", "red"))
+
+```
+
+From the logistic regression lines we can infere that income has not a different effect on males and females.
+Instead we can see that the Gender difference has a significant effect on the probability of Account Closure.
+
+```{r}
+set.seed(123)
+id_train <- sample(1:nrow(Data), size = 0.75*nrow(Data), replace = F)
+train_data <- Data[id_train,]
+val_data <- Data[-id_train,]
+```
 
 # 5 Best Model Selection
 
-For the sake of completness, we repeat the process of splitting the data into train and validation set
+For the sake of completeness, we repeat the process of splitting the data into train and validation set
 
 ```{r}
 
@@ -127,6 +405,18 @@ set.seed(123)
 id_train <- sample(1:nrow(Data), size = 0.75*nrow(Data), replace = F)
 train_data <- Data[id_train,]
 val_data <- Data[-id_train,]
+
+# Response variable distribution in the train test
+table(train_data$Closed_Account)
+prop.table(table(train_data$Closed_Account))
+
+# Response variable distribution in the original data
+table(Data$Closed_Account)
+prop.table(table(Data$Closed_Account))
+
+# Response variable distribution in the validation set
+table(val_data$Closed_Account)
+prop.table(table(val_data$Closed_Account))
 
 ```
 
@@ -175,8 +465,7 @@ logit_fit_aic1 <- step(glm(Closed_Account ~ 1,
                            family = "binomial",
                            data = train_data),
                        scope = formula(logit_fit_baseline),
-                       direction = "forward",
-                       k = log(nrow(train_data)))
+                       direction = "forward")
 ```
 
 The variable excluded by the forward selection, which obtains the best (least value) AIC=2885.02, are the following:
@@ -259,7 +548,8 @@ print(length(coefficients(logit_fit_bic2)))
 print(length(coefficients(logit_fit_bic3)))
 
 ```
-### PCA 
+
+## PCA 
 
 In order to perform a PCA, we have to consider only numerical variables in the train data. Then, considering the magnitude of the covariance matrix, a scaling process is needed.
 ```{r}
@@ -342,4 +632,9 @@ summary(logit_pca)
 
 ```
 
+## Best model selection
 
+Once we have selected the best model with AIC, BIC and PCA, we are now able to test them on the validation set in order to understand which of them performs in the best way.
+```{r}
+
+```
