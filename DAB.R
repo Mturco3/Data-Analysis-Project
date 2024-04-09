@@ -324,7 +324,7 @@ ggplot(val_data, aes(x = Income, y = predictions, color = Gender)) +
 library(class)
 
 # Set a range for k
-k_values <- 1:20
+k_values <- 1:25
 accuracy_scores <- numeric(length(k_values))
 
 # Loop over k values
@@ -344,6 +344,250 @@ plot(k_values, accuracy_scores, type = "b",
      xlab = "Number of Neighbors (k)", ylab = "Accuracy",
      main = "k-NN Model Accuracy by Number of Neighbors")
 
+# Best Model
+
+logit_fit1 <- glm(Closed_Account ~ .,
+                  family = "binomial",
+                  data = train_data)
+summary(logit_fit1)
+
+# Comparison based on deviance test (Chi-square test)
+logit_fit0 <- glm(Closed_Account ~ 1,
+                  family = "binomial",
+                  data = train_data)
+anova(logit_fit0, logit_fit1, test = "Chisq") 
+# We do reject the null hypothesis of equivalence between the two models.
+
+# Can we do better?
+# We have too many covariates, some of which are not significant. We could
+# perform some type of variable selection to keep only the most important ones.
+
+## Stepwise variable selection (based on AIC) ##
+
+# Forward
+logit_fit_aic1 <- step(glm(Closed_Account ~ 1,
+                           family = "binomial",
+                           data = train_data),
+                       scope = formula(logit_fit1),
+                       direction = "forward")
+
+# Backward
+logit_fit_aic2 <- step(logit_fit1,
+                       direction = "backward") 
+
+# Both directions
+logit_fit_aic3 <- step(logit_fit1,
+                       direction = "both")
+
+sort(coefficients(logit_fit_aic1))
+sort(coefficients(logit_fit_aic2))
+sort(coefficients(logit_fit_aic3))
+
+
+# Comparison based on deviance test (Chi-square test) for nested models
+anova(logit_fit_aic1, logit_fit1, test = "Chisq") 
+# We do not reject the null hypothesis of equivalence between the two models.
+
+
+## Stepwise variable selection (based on BIC) ##
+# Forward
+logit_fit_bic1 <- step(glm(Closed_Account ~ 1,
+                           family = "binomial",
+                           data = train_data),
+                       scope = formula(logit_fit1),
+                       direction = "forward",
+                       k = log(nrow(train_data)))
+
+# Backward
+logit_fit_bic2 <- step(logit_fit1,
+                       direction = "backward",
+                       k = log(nrow(train_data))) 
+
+# Both directions
+logit_fit_bic3 <- step(logit_fit1,
+                       direction = "both",
+                       k = log(nrow(train_data)))
+
+sort(coefficients(logit_fit_bic1))
+sort(coefficients(logit_fit_bic2))
+sort(coefficients(logit_fit_bic3))
+# The methods select the same variables
+# BIC is stricter than AIC and favors simpler models.
+
+# Comparison based on deviance test (Chi-square test)
+anova(logit_fit_bic2, logit_fit1, test = "Chisq") 
+# We do reject the null hypothesis of equivalence!
+
+# ----------------- model evaluation
+# Classic threshold
+tt <- 0.5
+
+str(train_data)
+
+# We can use this threshold to turn estimated probabilities into labels
+pred_aic <- as.factor(ifelse(logit_fit_aic1$fitted.values > tt, "yes", "no"))
+pred_bic <- as.factor(ifelse(logit_fit_bic1$fitted.values > tt, "yes", "no"))
+
+## Training set ##
+# based on aic
+True.positive = sum(pred_aic[which(train_data$Closed_Account == 1)] == "yes")
+True.negative = sum(pred_aic[which(train_data$Closed_Account == 0)] == "no")
+False.positive = sum(pred_aic[which(train_data$Closed_Account == 0)] == "yes")
+False.negative = sum(pred_aic[which(train_data$Closed_Account == 1)] == "no")
+Confusion.Matrix = matrix(c(True.positive, 
+                            False.positive, 
+                            False.negative, 
+                            True.negative),
+                          nrow = 2,ncol = 2)
+row.names(Confusion.Matrix) = c("Actual Positive", "Actual Negative")
+colnames(Confusion.Matrix) = c("Predicted Positive", "Predicted Negative")
+Confusion.Matrix
+
+(Sensitivity = True.positive/(True.positive + False.negative))
+(Specificity = True.negative/(True.negative + False.positive))
+(Accuracy = (True.positive + True.negative) / nrow(train_data))
+
+# based on bic
+True.positive = sum(pred_bic[which(train_data$Closed_Account == 1)] == "yes")
+True.negative = sum(pred_bic[which(train_data$Closed_Account == 0)] == "no")
+False.positive = sum(pred_bic[which(train_data$Closed_Account == 0)] == "yes")
+False.negative = sum(pred_bic[which(train_data$Closed_Account == 1)] == "no")
+Confusion.Matrix = matrix(c(True.positive, 
+                            False.positive, 
+                            False.negative, 
+                            True.negative),
+                          nrow = 2,ncol = 2)
+row.names(Confusion.Matrix) = c("Actual Positive", "Actual Negative")
+colnames(Confusion.Matrix) = c("Predicted Positive", "Predicted Negative")
+Confusion.Matrix
+
+(Sensitivity = True.positive/(True.positive + False.negative))
+(Specificity = True.negative/(True.negative + False.positive))
+(Accuracy = (True.positive + True.negative) / nrow(train_data))
+# On the training set the model based on aic performs slightly better in terms 
+# sensitivity.
+# This makes sense, since it uses a larger set of covariates.
+
+
+# To effectively choose the model, we should evaluate the performance on some 
+# data that has not been used for training.
+
+# Predictions for the observations in the validation set
+
+# Assuming 'df' is your dataframe
+val_data_2 <- val_data[, -c((ncol(val_data)-1):ncol(val_data))]
+
+prob_out_aic <- predict(logit_fit_aic1,
+                        newdata = val_data_2,
+                        type = "response")
+pred_out_aic <- as.factor(ifelse(prob_out_aic > tt, "yes", "no"))
+prob_out_bic <- predict(logit_fit_bic1,
+                        newdata = val_data$Closed_Account,
+                        type = "response")
+pred_out_bic <- as.factor(ifelse(prob_out_bic > tt, "yes", "no"))
+
+# based on aic
+True.positive = sum(pred_out_aic[which(val_data$Closed_Account == 1)] == "yes")
+True.negative = sum(pred_out_aic[which(val_data$Closed_Account == 0)] == "no")
+False.positive = sum(pred_out_aic[which(val_data$Closed_Account == 0)] == "yes")
+False.negative = sum(pred_out_aic[which(val_data$Closed_Account == 1)] == "no")
+Confusion.Matrix_aic = matrix(c(True.positive, 
+                                False.positive, 
+                                False.negative, 
+                                True.negative),
+                              nrow = 2,ncol = 2)
+row.names(Confusion.Matrix_aic) = c("Actual Positive", "Actual Negative")
+colnames(Confusion.Matrix_aic) = c("Predicted Positive", "Predicted Negative")
+Confusion.Matrix_aic
+
+(Sensitivity_aic = True.positive/(True.positive + False.negative))
+(Specificity_aic = True.negative/(True.negative + False.positive))
+(Accuracy_aic = (True.positive + True.negative) / nrow(val_data))
+
+# based on bic
+True.positive = sum(pred_out_bic[which(val_dat$subs_end == "yes")] == "yes")
+True.negative = sum(pred_out_bic[which(val_dat$subs_end == "no")] == "no")
+False.positive = sum(pred_out_bic[which(val_dat$subs_end == "no")] == "yes")
+False.negative = sum(pred_out_bic[which(val_dat$subs_end == "yes")] == "no")
+Confusion.Matrix_bic = matrix(c(True.positive, 
+                                False.positive, 
+                                False.negative, 
+                                True.negative),
+                              nrow = 2,ncol = 2)
+row.names(Confusion.Matrix_bic) = c("Actual Positive", "Actual Negative")
+colnames(Confusion.Matrix_bic) = c("Predicted Positive", "Predicted Negative")
+Confusion.Matrix_bic
+
+(Sensitivity_bic = True.positive/(True.positive + False.negative))
+(Specificity_bic = True.negative/(True.negative + False.positive))
+(Accuracy_bic = (True.positive + True.negative) / nrow(val_dat))
+# Also on the validation set, the model chosen via AIC is slightly better in terms 
+# terms of sensitivity.
+
+# Important: changing the threshold affects the results. 
+# Hence, the threshold should be tuned to find the best one for our purpose (we 
+# care more about the yes, more about the no, or equally about the two).
+
+
+# ROC (Receiver Operating Characteristic) curve and AUC (Area Under the Curve)
+# consider all the possible thresholds.
+# AUC provides a single number that can be used to choose between models.
+library(pROC)
+?roc
+
+## Training set ##
+# ROC curves
+roc_aic <- pROC::roc(train_dat$subs_end,
+                     logit_fit_aic1$fitted.values,
+                     plot = TRUE,
+                     col = "midnightblue",
+                     lwd = 3,
+                     auc.polygon = T,
+                     auc.polygon.col = "lightblue",
+                     print.auc = T)
+roc_bic <- pROC::roc(train_dat$subs_end,
+                     logit_fit_bic1$fitted.values,
+                     plot = TRUE,
+                     col = "midnightblue",
+                     lwd = 3,
+                     auc.polygon = T,
+                     auc.polygon.col = "lightblue",
+                     print.auc = T)
+
+# AUC scores
+roc_aic$auc
+roc_bic$auc
+# The models seem to perform similarly on the training set in terms of 
+# AUC
+
+
+## Validation set ##
+# ROC curves
+roc_out_aic <- pROC::roc(val_dat$subs_end,
+                         prob_out_aic,
+                         plot = TRUE,
+                         col = "midnightblue",
+                         lwd = 3,
+                         auc.polygon = T,
+                         auc.polygon.col = "lightblue",
+                         print.auc = T)
+roc_out_bic <- pROC::roc(val_dat$subs_end,
+                         prob_out_bic,
+                         plot = TRUE,
+                         col = "midnightblue",
+                         lwd = 3,
+                         auc.polygon = T,
+                         auc.polygon.col = "lightblue",
+                         print.auc = T)
+
+# AUC scores
+(auc_glm_aic <- roc_out_aic$auc)
+(auc_glm_bic <- roc_out_bic$auc)
+# The models perform similarly also on the validation set.
+
+# Put the results toghether
+(glm_aic <- c(Accuracy_aic, Sensitivity_aic, Specificity_aic, auc_glm_aic))
+(glm_bic <- c(Accuracy_bic, Sensitivity_bic, Specificity_bic, auc_glm_bic))
 
 
 
