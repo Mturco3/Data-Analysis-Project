@@ -590,4 +590,86 @@ roc_out_bic <- pROC::roc(val_dat$subs_end,
 (glm_bic <- c(Accuracy_bic, Sensitivity_bic, Specificity_bic, auc_glm_bic))
 
 
+## PCA 
 
+# In order to pèerform a PCA, we have to consider only numerical variables
+
+train_data_Numerical = train_data[numerical_variables]
+
+# After it, we must scale the data
+
+train_data_Numerical_Scaled= scale(train_data_Numerical)
+
+# Performing PCA on the scaled data
+
+pca <- princomp(train_data_Numerical_Scaled, cor = T, scale = F)
+
+str(pca)
+
+pca$loadings
+
+val_data_Numerical = val_data[numerical_variables]
+val_data_Numerical_Scaled= scale(val_data_Numerical)
+
+# Predicting scores for the validation set using the PCA model
+pca.val <- predict(pca, val_data_Numerical_Scaled)
+
+# Subsetting the first 10 principal components
+pca.val <- pca.val[, 1:10]
+
+# Calculating the variance explained by each PCA component
+pca.var <- pca$sdev^2
+pca.var.percent <- pca.var / sum(pca.var)
+
+# Calculating the cumulative variance explained
+cum.pca.var.percent <- cumsum(pca.var.percent)
+
+# Creating a data frame that stores the variance explained
+pca.explained <- data.frame(
+  Component = 1:length(pca.var.percent),
+  Variance = pca.var.percent,
+  CumulativeVariance = cum.pca.var.percent
+)
+
+# Printing the variance explained data frame
+pca.explained
+
+
+pca <- princomp(train_data_Numerical_Scaled, cor = T, scale = F) #already scaled
+
+pca$loadings
+
+val_data_Numerical = val_data[numerical_variables] # Validation data is scaled as the train data
+val_data_Numerical_Scaled= scale(val_data_Numerical)
+
+# Calculating the variance explained by each PCA component
+pca_var <- pca$sdev^2
+pca_var_percent <- pca_var / sum(pca_var)
+
+
+
+library(RColorBrewer)
+
+bar.comp = barplot(pca_var_percent,
+                   las = 2,
+                   col = rev(brewer.pal(9, "Blues")), 
+                   border = F,
+                   ylim = c(0, max(pca_var_percent)*1.5),
+                   ylab = "Explained variance")
+
+# choose components according to "elbow rule"
+
+lines(x = bar.comp, pca_var_percent, type = "b", pch = 20, cex = 1.5, lwd = 4, col = 2)
+
+text(bar.comp, 
+     pca_var_percent + 3, 
+     paste(round(pca_var_percent,1)),font = 2)
+
+# Calculating the cumulative variance explained
+cum_pca_var_percent <- cumsum(pca_var_percent)
+
+# Predicting scores for the validation set using the PCA model
+pca.val <- predict(pca, val_data_Numerical_Scaled)
+
+# Subsetting the first 10 principal components
+pca.val <- pca.val[, 1:10]

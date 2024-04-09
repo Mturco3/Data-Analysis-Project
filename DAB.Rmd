@@ -23,16 +23,323 @@ Data = read.csv2("./Dataset/bank_accounts_train.csv",
 
 ```
 
+# Data Preprocessing
 
-This is a paragraph in an R Markdown document.
-
-Below is a code chunk:
+In first place, we drop the first line since it is a pure identifier and it has no impact on the goal of the analysis. Then, we describe the variables present in the dataset.
 
 ```{r}
-fit = lm(dist ~ speed, data = cars)
-b   = coef(fit)
-plot(cars)
-abline(fit)
+
+Data$CLIENTNUM = NULL 
+str(Data)
+
 ```
 
-The slope of the regression is `r b[1]`.
+From the output, we infer that we have 15 numerical variables, 4 categorical variables and our target variable "Closed_Account".
+
+We proceed by turning numerical variables into numeric values and categorical variables into factors.
+
+```{r}
+variables = colnames(Data) # With this line we have a vector of our variables
+categorical_variables <- c("Gender", "Education_Level", "Marital_Status", "Card_Category") # We select our categorical variables (only 4 of them)
+target_variable = "Closed_Account"
+numerical_variables <- setdiff(variables, c(categorical_variables, target_variable)) 
+for (var in numerical_variables) {
+  Data[[var]] = as.numeric(Data[[var]])
+}
+
+for (var in categorical_variables) {
+  Data[[var]] = as.factor(Data[[var]])
+}
+
+Data$Closed_Account = as.factor(Data$Closed_Account)
+
+str(Data)
+
+```
+
+# Data Exploration
+
+# Dealing with NULL values
+
+```{r}
+
+#Rename missing values with NA notation
+Data[Data == 'Unknown'] <- NA
+
+# Now we try to understand where the missing values are
+
+# Sum the TRUE values by row to see how many NAs each row contains
+na_counts_per_row <- rowSums(is.na(Data))
+
+# Count how many rows have at least one NA
+rows_with_na <- sum(na_counts_per_row > 0)
+
+# Print the result
+print(rows_with_na)
+
+# Since there is a significant number of rows with missing values, dropping them is not an
+# optimal solution
+
+# Count NAs in each column
+na_counts_per_column <- colSums(is.na(Data))
+
+# Print the result
+print(na_counts_per_column)
+
+# Missing values are only present in "Marital Status" and "Educational Level". 
+
+
+#We decided to impute missing values with the mode of the other instances
+#in the same column
+
+getSimpleMode <- function(x) {
+  # Use table() to count occurrences of each value, sort in decreasing order, and return the name of the first element
+  tbl <- table(x)
+  mode_value <- names(tbl[tbl == max(tbl)])[1]
+  return(mode_value)
+}
+
+
+for (var in categorical_variables) {
+  if (any(is.na(Data[[var]]))) {
+    Data[[var]][is.na(Data[[var]])] <- getSimpleMode(Data[[var]])
+  }
+}
+
+# Sum the TRUE values by row to see how many NAs each row contains
+na_counts_per_row <- rowSums(is.na(Data))
+
+# Count how many rows have at least one NA
+rows_with_na <- sum(na_counts_per_row > 0)
+
+# Print the result
+print(rows_with_na)
+
+```
+
+# 5 Best Model Selection
+
+For the sake of completness, we repeat the process of splitting the data into train and validation set
+
+```{r}
+
+set.seed(123)
+id_train <- sample(1:nrow(Data), size = 0.75*nrow(Data), replace = F)
+train_data <- Data[id_train,]
+val_data <- Data[-id_train,]
+
+```
+
+In the first place, we consider as baseline the models in which no variable is used and all variables are included. Firstly, we build the model with each variable:
+
+```{r}
+logit_fit_baseline <- glm(Closed_Account ~ .,
+                  family = "binomial",
+                  data = train_data)
+summary(logit_fit_baseline)
+
+```
+
+Then, we consider the model without any variable:
+
+```{r}
+logit_fit_0 <- glm(Closed_Account ~ 1,
+                  family = "binomial",
+                  data = train_data)
+summary(logit_fit_0)
+
+```
+
+We then test the hypothesis of equivalence between the two models:
+
+```{r}
+logit_fit0 <- glm(Closed_Account ~ 1,
+                  family = "binomial",
+                  data = train_data)
+anova(logit_fit_0, logit_fit_baseline, test = "Chisq") 
+
+```
+The difference in deviance between the two models is 2233.5 with 26 degrees of freedom, which is highly significant (p < 0.00000000000000022). This indicates that the full model provides a significantly better fit to the data than the null model.
+
+## Variable Selection with AIC and BIC
+
+In spite of the result obtained before, there are too many covariates, some of which are not really significant for the model. We can then perform some type of variable selection to keep only the most important ones.
+
+
+### Stepwise variable selection (based on AIC) 
+
+Forward selection: 
+```{r}
+# Forward
+logit_fit_aic1 <- step(glm(Closed_Account ~ 1,
+                           family = "binomial",
+                           data = train_data),
+                       scope = formula(logit_fit_baseline),
+                       direction = "forward",
+                       k = log(nrow(train_data)))
+```
+
+The variable excluded by the forward selection, which obtains the best (least value) AIC=2885.02, are the following:
+Income, Customer_Age, Months_on_book, Avg_Open_To_Buy, Credit_Limit, Avg_Utilization_Ratio, Card_Category and Education_Level. 
+
+Backward selection:
+```{r}
+# Backward
+logit_fit_aic2 <- step(logit_fit_baseline,
+                       direction = "backward") 
+
+```
+
+The variable excluded by the backward selection, which obtains the best (least value) AIC=2794.54: are the following:
+Months_on_book, Credit Limit and Avg_Utilization_Ratio and Customer Age.
+
+Both directions:
+```{r}
+# Both directions
+logit_fit_aic3 <- step(logit_fit_baseline,
+                       direction = "both")
+```
+
+The variable excluded by the selection in both directions, which obtains the best (least value) AIC=2794.9: are the following:
+Months_on_book, Avg_Open_To_Bu and Avg_Utilization_Ratio, Credit Limit, 
+
+In order to select the best model, we identify the one with the lowest number of covariates:
+```{r}
+
+print(length(coefficients(logit_fit_aic1)))
+print(length(coefficients(logit_fit_aic2)))
+print(length(coefficients(logit_fit_aic3)))
+
+```
+
+### Stepwise variable selection (based on BIC) 
+
+Forward selection: 
+```{r}
+
+# Forward
+logit_fit_bic1 <- step(glm(Closed_Account ~ 1,
+                           family = "binomial",
+                           data = train_data),
+                       scope = formula(logit_fit_baseline),
+                       direction = "forward")
+```
+
+The variable excluded by the forward selection, which obtains the best (least value) AIC=2794.92, are the following:
+Card_Category, Customer_Age, Months_on_book, Avg_Open_To_Bu and Avg_Utilization_Ratio.
+
+Backward selection:
+```{r}
+# Backward
+logit_fit_bic2 <- step(logit_fit_baseline,
+                       direction = "backward",
+                       k = log(nrow(train_data)))  
+
+```
+
+The variable excluded by the backward selection, which obtains the best (least value) AIC=2794.54: are the following:
+Educational_Level, Card Category, Months_on_book, Credit_Limit, Avg_Utilization_Ratio, Avg_Open_To_Buy, Customer_Age and Income.
+
+Both directions:
+```{r}
+# Both directions
+logit_fit_bic3 <- step(logit_fit_baseline,
+                       direction = "both",
+                       k = log(nrow(train_data)))
+```
+
+The variable excluded by the selection in both directions, which obtains the best (least value) AIC=2794.9: are the following:
+Income, Customer_Age, Months_on_book, Avg_Open_To_Buy, Credit_Limit, Avg_Utilization_Ratio, Card_Category and Educational_Level.
+
+In order to select the best model, we identify the one with the lowest number of covariates:
+```{r}
+
+print(length(coefficients(logit_fit_bic1)))
+print(length(coefficients(logit_fit_bic2)))
+print(length(coefficients(logit_fit_bic3)))
+
+```
+### PCA 
+
+In order to perform a PCA, we have to consider only numerical variables in the train data. Then, considering the magnitude of the covariance matrix, a scaling process is needed.
+```{r}
+
+train_data_Numerical = train_data[numerical_variables]
+
+cov(train_data_Numerical)
+
+train_data_Numerical_Scaled= scale(train_data_Numerical)
+
+cov(train_data_Numerical_Scaled)
+
+```
+
+```{r}
+
+pca <- princomp(train_data_Numerical_Scaled, cor = T, scale = F) #already scaled
+
+pca$loadings
+
+# Calculating the variance (in percentage) explained by each PCA component
+pca_var <- pca$sdev^2
+pca_var_percent <- pca_var / sum(pca_var)
+
+```
+
+```{r}
+library(RColorBrewer)
+
+bar.comp = barplot(pca_var_percent,
+                   las = 2,
+                   col = rev(brewer.pal(9, "Blues")), 
+                   border = F,
+                   ylim = c(0, max(pca_var_percent)*1.5),
+                   ylab = "Explained variance")
+
+# choose components according to "elbow rule"
+
+lines(x = bar.comp, pca_var_percent, type = "b", pch = 16, cex = 1.5, lwd = 2, col = 2)
+grid()
+
+```
+
+```{r}
+
+# Calculating the cumulative variance explained
+cum_pca_var_percent <- cumsum(pca_var_percent)*100
+
+# Plotting the cumulative distribution
+
+bar.comp = barplot(cum_pca_var_percent,
+                   las = 2,
+                   col = rev(brewer.pal(9, "Blues")), 
+                   border = F,
+                   ylim = c(0, 105),
+                   ylab = "Explained variance")
+
+lines(bar.comp, cum_pca_var_percent, type = "b", pch = 16, cex = 1.5, lwd = 2, col = 2)
+grid()
+
+```
+
+Considering the barplot, it is clear that the total variance is mostly explained by the first 11 components that are consequently selected. The first component is the one with the highest percentage of explained variance, with a value of 0.17.
+
+```{r}
+
+val_data_Numerical = val_data[numerical_variables] # Validation data is scaled as the train data
+val_data_Numerical_Scaled= scale(val_data_Numerical)
+
+# Predicting scores for the validation set using the PCA model
+pca_data <- predict(pca, train_data_Numerical_Scaled)
+
+# Selecting the first 11 principal components
+pca_data <- pca_data[, 1:11]
+
+
+logit_pca = glm(Closed_Account ~ ., data = data.frame(pca_data, Closed_Account = train_data$Closed_Account), 
+                family = "binomial")
+summary(logit_pca)
+
+```
+
+
