@@ -16,6 +16,7 @@ In order to run all the chunks below, the following libraries need to be importe
 ```{r}
 library(ggplot2)
 library(corrplot)
+library(class)
 
 ```
 
@@ -130,7 +131,7 @@ ggplot(Data, aes(x = Gender, fill = as.factor(Closed_Account))) +
   labs(title = "Proportion of Closed Account By Gender", x = "Gender", y = "Proportion") +
   smaller_text_theme
 ```
-
+### Marital Status
 ```{r}
 #MARITAL STATUS
 x <- table(addNA(Data$Marital_Status))
@@ -190,6 +191,7 @@ ggplot(Data, aes(x = Marital_Status, fill = as.factor(Closed_Account))) +
   labs(title = "Proportion of Closed Accounts by Marital_Status", x = "Income Bin", y = "Proportion") +
   smaller_text_theme
 ```
+### Education Level
 
 ```{r}
 #EDUCATION LEVEL
@@ -235,7 +237,7 @@ ggplot(Data, aes(x = Education_Level, y = Credit_Limit, fill = Education_Level))
   theme(
     axis.text.x = element_text(angle = 45, hjust = 1)  # Rotate x-axis labels for better readability
   ) +
-  scale_fill_manual(values = c("lightpink", "lightblue", "#FFFF99", "lightgreen", "brown", "violet"))
+  scale_fill_manual(values = c("lightpink", "lightblue", "#FFFF99", "lightgreen", "brown", "violet", "blue"))
 
 ##Education_Level-Closed_Account
 
@@ -245,7 +247,7 @@ ggplot(Data, aes(x = Education_Level, fill = as.factor(Closed_Account))) +
   labs(title = "Proportion of Closed Accounts by Education_Level", x = "Education_Level", y = "Proportion") +
   smaller_text_theme
 ```
-
+### Card Category
 ```{r}
 
 # Card Category
@@ -285,8 +287,30 @@ ggplot(Data, aes(x = Card_Category, fill = as.factor(Closed_Account))) +
   smaller_text_theme
 
 ```
+### Graphical Exploration of Numerical Variables
 
-## Correlation Matrix
+```{r}
+
+Numerical_Data = Data[numerical_variables]
+means_vec = apply(X = Numerical_Data, MARGIN = 2, FUN = mean)
+median_vec = apply(X = Numerical_Data, MARGIN = 2, FUN = median)
+sd_vec = apply(X = Numerical_Data, MARGIN = 2, FUN = sd)
+
+par(mfrow = c(3,3), mar = c(2,4,4,1))
+
+for(i in 1:length(numerical_variables)){
+  hist(Numerical_Data[,i], freq = F, main = names(Numerical_Data)[i],
+       col = rgb(.7,.7,.7), border = "white", xlab = "")
+  abline(v = means_vec[i], lwd = 2)
+  abline(v = median_vec[i], lwd = 2, col = rgb(.7,0,0))
+  legend("top", c("Mean", "Median"), lwd = 2, col = c(1, rgb(.7,0,0)),cex = .8, bty = "n")
+}
+
+```
+
+As we can see from the density distributions, almost all the numerical variables have the mean and the median are close together, and hence their distribution is likely symmetric, as showed in the plots. Indeed, only few of them presents a long tail and are highly skewed to the left or the the right (Credit_Limit, Avg_Open_To_Buy and Avg_Utilization_Ratio) and, even in those cases, median and mean are still really close with respect to each other.
+
+### Correlation Matrix
 
 In the following chunk, we analyzed the correlation between numerical variables plotting a correlation matrix.
 
@@ -358,10 +382,14 @@ rows_with_na <- sum(na_counts_per_row > 0)
 # Print the result
 print(rows_with_na)
 
+str(Data)
+
 ```
+
 # 3 Logistic Regression Model to estimate effects of Income and Gender on Closed_Account
 
-In the first place, we fit the model to the data and we consider the summary of the model.
+In the first place, we fit the model to the data and we consider the summary of the model. In this case, we do not exclude the hypothesis that Income and Gender interact with each other and consequently, the predictors used are both of them and their interaction.
+
 ```{r}
 
 # Fit logistic regression model
@@ -373,26 +401,85 @@ summary(gender_income_model)
 
 ```
 
-Comment the results obtained in the summary:
+Intercept: The estimated probability of an account being closed when Income is 0 and Gender is Female is -1.5474767. This is statistically significant with a very low p-value (< 2e-16), indicating strong evidence against the null hypothesis of no effect.This is something that we could have expected considering the highly unbalanced distribution of the target variable, as stated in the EDA process.
 
-We then proceed by plotting the regression lines
+Income: The coefficient for Income is -0.0001008 and is not statistically significant (p-value 0.89207), suggesting that this variables does not have a strong effect on the probability of account closure.
+
+We then proceed by computing predictions and plotting the respective regression lines:
 
 ```{r}
-ggplot(val_data, aes(x = Income, y = predictions, color = Gender)) + 
+
+predicted_probabilities_logistic <- predict(gender_income_model, newdata = Data, type="response")
+
+Data$predicted_probabilities <- predict(gender_income_model, newdata = Data, type="response")
+```
+
+```{r}
+#Plotting computed probabilities
+ggplot(Data, aes(x = Income, y = predicted_probabilities, color = Gender)) + 
   geom_line() + 
   labs(title = "Probability of Account Closure by Income and Gender", y = "Probability of Closure", x = "Income") +
-  scale_color_manual(values = c("blue", "red"))
+  scale_color_manual(values = c("red", "blue"))
+
+Data$predicted_probabilities = NULL # We drop the column of predicted probabilities since it is now useless
+
 
 ```
 
-From the logistic regression lines we can infere that income has not a different effect on males and females.
-Instead we can see that the Gender difference has a significant effect on the probability of Account Closure.
+
+
+# 4 KNN
+The first step required is the split of the training data between validation and train set. After the splitting is performed, there is the need to check whether the distribution of the target variable remained constant in the validation and in the test set.
+
 
 ```{r}
 set.seed(123)
 id_train <- sample(1:nrow(Data), size = 0.75*nrow(Data), replace = F)
 train_data <- Data[id_train,]
 val_data <- Data[-id_train,]
+
+# Response variable distribution in the original data
+print("Distribution of the target variable in the original set")
+table(Data$Closed_Account)
+prop.table(table(Data$Closed_Account))
+
+# Response variable distribution in the train test
+print("Distribution of the target variable in the train set")
+table(train_data$Closed_Account)
+prop.table(table(train_data$Closed_Account))
+
+
+
+# Response variable distribution in the validation set
+print("Distribution of the target variable in the validation set")
+table(val_data$Closed_Account)
+prop.table(table(val_data$Closed_Account))
+```
+
+In this case, the distribution is really similar between different sets.
+
+KNN is a model that requires numerical 
+```{r}
+# Set a range for k
+k_values <- 1:25
+accuracy_scores <- numeric(length(k_values))
+
+# Loop over k values
+for (k in k_values) {
+  set.seed(123) # for reproducibility
+  knn_pred <- knn(train = train_data[, c("Total_Trans_Amt", "Total_Trans_Ct")],
+                  test = val_data[, c("Total_Trans_Amt", "Total_Trans_Ct")],
+                  cl = train_data$Closed_Account,
+                  k = k)
+  
+  # Calculate accuracy
+  accuracy_scores[k] <- sum(val_data$Closed_Account == knn_pred) / length(knn_pred)
+}
+
+# Now, plot the accuracy scores as a function of k
+plot(k_values, accuracy_scores, type = "b", 
+     xlab = "Number of Neighbors (k)", ylab = "Accuracy",
+     main = "k-NN Model Accuracy by Number of Neighbors")
 ```
 
 # 5 Best Model Selection
@@ -401,22 +488,12 @@ For the sake of completeness, we repeat the process of splitting the data into t
 
 ```{r}
 
-set.seed(123)
+set.seed(10)
 id_train <- sample(1:nrow(Data), size = 0.75*nrow(Data), replace = F)
 train_data <- Data[id_train,]
 val_data <- Data[-id_train,]
 
-# Response variable distribution in the train test
-table(train_data$Closed_Account)
-prop.table(table(train_data$Closed_Account))
 
-# Response variable distribution in the original data
-table(Data$Closed_Account)
-prop.table(table(Data$Closed_Account))
-
-# Response variable distribution in the validation set
-table(val_data$Closed_Account)
-prop.table(table(val_data$Closed_Account))
 
 ```
 
@@ -449,6 +526,7 @@ logit_fit0 <- glm(Closed_Account ~ 1,
 anova(logit_fit_0, logit_fit_baseline, test = "Chisq") 
 
 ```
+
 The difference in deviance between the two models is 2233.5 with 26 degrees of freedom, which is highly significant (p < 0.00000000000000022). This indicates that the full model provides a significantly better fit to the data than the null model.
 
 ## Variable Selection with AIC and BIC
@@ -468,8 +546,8 @@ logit_fit_aic1 <- step(glm(Closed_Account ~ 1,
                        direction = "forward")
 ```
 
-The variable excluded by the forward selection, which obtains the best (least value) AIC=2885.02, are the following:
-Income, Customer_Age, Months_on_book, Avg_Open_To_Buy, Credit_Limit, Avg_Utilization_Ratio, Card_Category and Education_Level. 
+The variable excluded by the forward selection, which obtains the best (least value) AIC=2880.6, are the following:
+Income, Customer_Age, Months_on_book, Avg_Open_To_Buy, Credit_Limit, Avg_Utilization_Ratio, Card_Category and Gender.
 
 Backward selection:
 ```{r}
@@ -479,8 +557,8 @@ logit_fit_aic2 <- step(logit_fit_baseline,
 
 ```
 
-The variable excluded by the backward selection, which obtains the best (least value) AIC=2794.54: are the following:
-Months_on_book, Credit Limit and Avg_Utilization_Ratio and Customer Age.
+The variable excluded by the backward selection, which obtains the best (least value) AIC=2880.5: are the following:
+Gender, Months_on_book, Credit Limit, Avg_Open_To_Buy, Avg_Utilization_Ratio and Customer Age, Card Category and Income.
 
 Both directions:
 ```{r}
@@ -511,7 +589,8 @@ logit_fit_bic1 <- step(glm(Closed_Account ~ 1,
                            family = "binomial",
                            data = train_data),
                        scope = formula(logit_fit_baseline),
-                       direction = "forward")
+                       direction = "forward",
+                       k = log(nrow(train_data)))
 ```
 
 The variable excluded by the forward selection, which obtains the best (least value) AIC=2794.92, are the following:
