@@ -34,118 +34,14 @@ numerical_variables <- setdiff(numerical_variables, target_variable)
 
 # Plots categorical variables
 
-# Gender
-x = table(Data$Gender)
-r = round(x/nrow(Data)*100, 2)
-s = paste( r, "%", sep = "")
-pie(table(Data$Gender))
-{pie(x = table(Data$Gender), 
-     labels = s,
-     edges = 10000, 
-     radius = 1,
-     init.angle = 90, 
-     col = c(rgb(1,0,0, .5),
-             rgb(0,0,1,0.5)),
-     cex = 2)
-  mtext("Gender", side = 3, cex = 2)
-  legend("topright", 
-         pch = 15, 
-         col = c(rgb(1,0,0, .5),
-                 rgb(0,0,1,0.5)),
-         c("Female", "Male"), cex = 1.7,
-         bty = "n")}
 
-#Marital Status
-x <- table(addNA(Data$Marital_Status))
-r = round(x/nrow(Data)*100, 2)
-s = paste( r, "%", sep = "")
-pie(table(Data$Marital_Status))
-{pie(x = table(Data$Marital_Status), 
-     labels = s,
-     edges = 10000, 
-     radius = 1,
-     init.angle = 90, 
-     col = c(rgb(1,0,0,0.5),
-             rgb(0,0,1,0.5),
-             rgb(0,0,0.5,1),
-             rgb(1,0.5,1,1)
-             ),
-     cex = 1)
-  mtext("Marital Status", side = 3, cex = 1.5, line = 1)
-  legend("topright", 
-         pch = 15, 
-         col = c(rgb(1,0,0, .5),
-                 rgb(0,0,1,0.5),
-                 rgb(0,0, .5,1),
-                 rgb(1,0.5,1,1)
-                 ),
-         c("Married", "Single", "Divorced", "Unknown"), cex = 1,
-         bty = "n")}
-
-#Educational Level
-education_table <- table(Data$Education_Level)
-r <- round(education_table / nrow(Data) * 100, 2)
-s <- paste(r, "%", sep = "")
-
-pie(x = education_table, 
-    labels = s,
-    edges = 10000, 
-    radius = 1,
-    init.angle = 90, 
-    col = c(rgb(1,0,0,0.5),
-            rgb(0,0,1,0.5),
-            rgb(0,0,0.5,1),
-            rgb(0.5,0.5,0,1),
-            rgb(0.3,0,0.5,0.8),
-            rgb(1,0.8,0,0.5),
-            rgb(1,0.5,1,1)),
-    cex = 1)
-mtext("Education Level", side = 3, cex = 1.5, line = 1) # side=3 is the top
-legend("topleft", 
-       pch = 15, 
-       col = c(rgb(1,0,0,0.5),
-               rgb(0,0,1,0.5),
-               rgb(0,0,0.5,1),
-               rgb(0.5,0.5,0,1),
-               rgb(0.3,0,0.5,0.8),
-               rgb(1,0.8,0,0.5),
-               rgb(1,0.5,1,1)),
-       legend = levels(Data$Education_Level), cex = 1,
-       bty = "n")
-
-# Card Category
-card_table <- table(Data$Card_Category)
-r <- round(card_table / nrow(Data) * 100, 2)
-s <- paste(r, "%", sep = "")
-s2 <- paste(levels(Data$Card_Category), s)
-
-pie(x = card_table, 
-    edges = 10000, 
-    radius = 1,
-    init.angle = 90, 
-    col = c(rgb(1,0,0,0.5),
-            rgb(0,0,1,0.5),
-            rgb(0,0,0.5,1),
-            rgb(0.5,0.5,0,1)
-            ),
-    cex = 1)
-mtext("Card Category", side = 3, cex = 1.5, line = 1) # side=3 is the top
-legend( x= -2.4, y = 1,
-       pch = 15, 
-       col = c(rgb(1,0,0,0.5),
-               rgb(0,0,1,0.5),
-               rgb(0,0,0.5,1),
-               rgb(0.5,0.5,0,1)
-               ),
-       legend = s2, cex = 1,
-       bty = "n")
 
 # Graphical exploration of Numerical Variables
 Numerical_Data = Data[numerical_variables]
-(means_vec = apply(X = Numerical_Data, MARGIN = 2, FUN = mean))
+means_vec = apply(X = Numerical_Data, MARGIN = 2, FUN = mean)
 colMeans(Numerical_Data)
-(median_vec = apply(X = Numerical_Data, MARGIN = 2, FUN = median))
-(sd_vec = apply(X = Numerical_Data, MARGIN = 2, FUN = sd))
+median_vec = apply(X = Numerical_Data, MARGIN = 2, FUN = median)
+sd_vec = apply(X = Numerical_Data, MARGIN = 2, FUN = sd)
 
 ncol(Numerical_Data)
 par(mfrow = c(3,3), mar = c(2,4,4,1))
@@ -223,9 +119,11 @@ cor_matrix <- cor(Numerical_Data, use = "complete.obs")  # 'use' handles missing
 
 corrplot(cor_matrix, method = "color", tl.srt = 45, tl.col = "black") # Using the library corrplot
 
+Numerical_Data = Data[numerical_variables]
+target_variable_numeric = as.numeric(Data$Closed_Account)
 
 # Correlation with target variable
-correlations <- sapply(Numerical_Data, function(x) cor(x, Data$Closed_Account, use = "complete.obs"))
+correlations <- sapply(Numerical_Data, function(x) cor(x, target_variable_numeric, use = "complete.obs"))
 
 # Omit the target variable from the plot if it's included in the Data frame
 correlations <- abs(correlations[names(correlations) != "target_var"])
@@ -311,7 +209,7 @@ print(conf_matrix)
 
 
 #Now let's show the probabilities on some plots
-ggplot(val_data, aes(x = Income, y = predictions, color = Gender)) + 
+ggplot(val_data, aes(x = Income, y = predicted_probabilities, color = Gender)) + 
   geom_line() + 
   labs(title = "Probability of Account Closure by Income and Gender", y = "Probability of Closure", x = "Income") +
   scale_color_manual(values = c("blue", "red"))
