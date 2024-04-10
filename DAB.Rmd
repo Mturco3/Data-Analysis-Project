@@ -15,7 +15,8 @@ The dataset contains information about bank customers. The goal is to predict wh
 
 In order to run all the chunks below, the following libraries need to be imported. However, for the sake of simplicity, the code is not displayed in the generated pdf file.
 
-```{r}
+```{r, warning=FALSE, message=FALSE}
+
 library(ggplot2)
 library(corrplot)
 library(class)
@@ -25,6 +26,8 @@ library(RColorBrewer)
 ```
 
 # Data Import
+
+Correctly importing data is crucial, and setting colClasses = "character" during the import process can prevent R from automatically converting data types. This approach ensures that all information, such as leading zeros, is preserved exactly as it appears in the source file. For instance, when importing a CSV file without losing leading zeros or unintentionally converting data:
 
 ```{r}
 Data = read.csv2("./Dataset/bank_accounts_train.csv", 
@@ -46,7 +49,7 @@ str(Data)
 ```
 
 From the output, we infer that we have 15 numerical variables, 4 categorical variables and our target variable "Closed_Account".
-We proceed by turning numerical variables into numeric values and categorical variables into factors.
+Next, we will convert the numerical variables to numeric types and the categorical variables to factors to ensure they are appropriately processed during our analysis."
 
 ```{r}
 variables = colnames(Data) # With this line we have a vector of our variables
@@ -66,10 +69,37 @@ Data$Closed_Account = as.factor(Data$Closed_Account)
 
 # EDA
 
+## Target Variable Distribution
+
+```{r, echo=FALSE, fig.height=5.4, fig.width=18}
+x = table(Data$Closed_Account)
+r = round(x/nrow(Data)*100, 2)
+s = paste( r, "%", sep = "")
+{pie(x = table(Data$Closed_Account), 
+     labels = s,
+     edges = 10000, 
+     radius = 1,
+     init.angle = 90, 
+     col = c("green",
+             "red"),
+     cex = 1.6)
+  mtext("Closed Account", side = 3, cex = 2)
+  legend("topleft", 
+         pch = 15, 
+         col = c("green", "red"),
+         c("Not churn", "Churn"), cex = 1.2,
+         bty = "n")}
+```
+
+The pie chart illustrates the distribution of the binary categorical target variable 'Closed Account', which represents churn status. Two segments are visible: 'Not churn', constituting a majority with approximately 84% of the accounts, and 'Churn', representing about 16%. This significant imbalance indicates that far fewer customers have closed their accounts compared to those who haven't.
+
+In a real-world context, this kind of target variable is critical for businesses to understand customer retention. 'Churn' signifies customers who have ended their relationship with the company, while 'Not churn' indicates customers who continue to engage with the company's services or products. 
+
 ## Categorical Variables exploration
 
 ### Gender
-```{r}
+
+```{r, echo=FALSE, fig.height=10.8, fig.width=36}
 x = table(Data$Gender)
 r = round(x/nrow(Data)*100, 2)
 s = paste( r, "%", sep = "")
@@ -105,9 +135,10 @@ ggplot(Data, aes(x = Gender, fill = as.factor(Closed_Account))) +
   labs(title = "Proportion of Closed Account By Gender", x = "Gender", y = "Proportion") +
   smaller_text_theme
 ```
+
 ### Marital Status
 
-```{r}
+```{r, echo=FALSE, fig.height=5.4, fig.width=18}
 #MARITAL STATUS
 x <- table(addNA(Data$Marital_Status))
 r = round(x/nrow(Data)*100, 2)
@@ -140,9 +171,10 @@ ggplot(Data, aes(x = Marital_Status, fill = as.factor(Closed_Account))) +
   labs(title = "Proportion of Closed Accounts by Marital_Status", x = "Income Bin", y = "Proportion") +
   smaller_text_theme
 ```
+
 ### Education Level
 
-```{r}
+```{r, echo=FALSE, fig.height=5.4, fig.width=18}
 #EDUCATION LEVEL
 education_table <- table(Data$Education_Level)
 r <- round(education_table / nrow(Data) * 100, 2)
@@ -180,8 +212,10 @@ ggplot(Data, aes(x = Education_Level, fill = as.factor(Closed_Account))) +
   labs(title = "Proportion of Closed Accounts by Education_Level", x = "Education_Level", y = "Proportion") +
   smaller_text_theme
 ```
+
 ### Card Category
-```{r}
+
+```{r, echo=FALSE, fig.height=5.4, fig.width=18}
 
 # Card Category
 card_table <- table(Data$Card_Category)
@@ -189,7 +223,7 @@ r <- round(card_table / nrow(Data) * 100, 2)
 s <- paste(r, "%", sep = "")
 s2 <- paste(levels(Data$Card_Category), s)
 
-pie(x = card_table, 
+pie(x = card_table,
     edges = 10000, 
     radius = 1,
     init.angle = 90, 
@@ -220,11 +254,14 @@ ggplot(Data, aes(x = Card_Category, fill = as.factor(Closed_Account))) +
 ```
 
 From the analysis of the categorical variables in our dataset, it's evident that there's a significant imbalance in the target variable — the number of people closing accounts is consistently below 20% across all categories. This skew could present challenges when building predictive models, as there’s a smaller pool of closure events to learn from. Moreover, none of the categories across our variables show a disproportionate tendency towards account closure, indicating no single categorical predictor strongly influences churn.
-A point of concern is the presence of 'Unknown' values within 'Educational_Level' and 'Marital_Status'. These entries, which represent a lack of data, might complicate our analysis. They introduce a level of uncertainty that could distort the models' predictions, making them less reliable. It’s crucial to address these anomalies, perhaps by exploring data imputation techniques or sensitivity analyses, to mitigate their potential impact on the predictive performance of our models.
+A point of concern is the presence of 'Unknown' values within 'Educational_Level' and 'Marital_Status'. These entries, which represent a lack of data, might complicate our analysis. They introduce a level of uncertainty that could distort the models' predictions, making them less reliable. It’s crucial to address these anomalies to mitigate their potential impact on the predictive performance of our models.
+
+
+We can now proceed with a graphical exploration (including also the computation of basic stats) for our Numerical Variables.
 
 ### Graphical Exploration of Numerical Variables
 
-```{r}
+```{r, echo=FALSE}
 
 Numerical_Data = Data[numerical_variables]
 means_vec = apply(X = Numerical_Data, MARGIN = 2, FUN = mean)
@@ -249,13 +286,16 @@ The density plots suggest that most numerical variables in our dataset have symm
 
 In the following chunk, we analyzed the correlation between numerical variables plotting a correlation matrix.
 
-```{r}
+```{r, echo=FALSE}
 
 
 cor_matrix <- cor(Data[numerical_variables], use="complete.obs")
+# Increase the size of the margins 
+par(mar = c(5, 8, 4, 2) + 0.1) 
+
 corrplot(cor_matrix, method = "color", tl.srt = 45, tl.col = "black") 
 
-
+par(mar = c(5, 4, 4, 2) + 0.1) # Default size
 
 ```
 
@@ -265,7 +305,7 @@ From the correlation matrix we can clearly see some relevant correlations that m
 
 The provided plot illustrates the correlations between numerical variables and the target variable, offering a preliminary insight that can be crucial before building predictive models. Such an analysis helps in pinpointing variables that might have limited predictive power regarding the target variable. By identifying these less influential variables early on, we can streamline the modeling process by focusing on more significant predictors.
 
-```{r}
+```{r, echo=FALSE}
 target_variable_numeric = as.numeric(Data$Closed_Account)
 
   correlations <- sapply(Data[numerical_variables], function(x) cor(x, target_variable_numeric, use = "complete.obs"))
@@ -286,11 +326,15 @@ The plot reveals that 'Income' has a notably low correlation with the target var
 
 ## Dealing with missing values
 
+Firstly, in order to have a better understanding of the number of data instances that contains Unknown values, we convert them in NA values and we directly count them using basic R commands.
+
 ```{r}
 
 #Rename missing values with NA notation
 Data[Data == 'Unknown'] <- NA
+```
 
+```{r, echo=FALSE}
 # Now we try to understand where the missing values are
 
 # Sum the TRUE values by row to see how many NAs each row contains
@@ -308,11 +352,8 @@ cat("Rows with NA before preprocessing:", rows_with_na, "\n")
 The dataset contains a considerable number of rows with missing values, predominantly within two variables. Discarding these rows would significantly reduce our dataset and potentially introduce bias by removing valuable information. Therefore, a preferable approach is to replace each 'Unknown' value with the mode of its respective variable. This strategy maintains the dataset's integrity and avoids the information loss that would occur with row deletion. The mode is the most frequent value in a variable, ensuring that we impute a statistically common category, which preserves the underlying distribution and relationships between variables. Moreover, using the mode for imputation is particularly suitable for categorical data, where mean or median replacements are not applicable
 
 ```{r}
-#We decided to impute missing values with the mode of the other instances
-#in the same column
-
+#Basic function to compute mode
 getSimpleMode <- function(x) {
-  # Use table() to count occurrences of each value, sort in decreasing order, and return the name of the first element
   tbl <- table(x)
   mode_value <- names(tbl[tbl == max(tbl)])[1]
   return(mode_value)
@@ -324,7 +365,9 @@ for (var in categorical_variables) {
     Data[[var]][is.na(Data[[var]])] <- getSimpleMode(Data[[var]])
   }
 }
+```
 
+```{r echo=FALSE}
 # Sum the TRUE values by row to see how many NAs each row contains
 na_counts_per_row <- rowSums(is.na(Data))
 
@@ -345,7 +388,9 @@ We start by fitting the logistic regression model to our data, carefully examini
 
 # Fit logistic regression model
 set.seed(1)
-gender_income_model <- glm(Closed_Account ~ Income * Gender, family = binomial(link = "logit"), data = Data)
+gender_income_model <- glm(Closed_Account ~ Income * Gender, 
+                           family = binomial(link = "logit"), 
+                           data = Data)
 
 # View model summary
 summary(gender_income_model)
@@ -369,13 +414,16 @@ predicted_probabilities_logistic <- predict(gender_income_model, newdata = Data,
 Data$predicted_probabilities <- predict(gender_income_model, newdata = Data, type="response")
 ```
 
-```{r}
+```{r, echo=FALSE}
 #Plotting computed probabilities
 ggplot(Data, aes(x = Income, y = predicted_probabilities, color = Gender)) + 
   geom_line() + 
   labs(title = "Probability of Account Closure by Income and Gender", y = "Probability of Closure", x = "Income") +
   scale_color_manual(values = c("red", "blue"))
 
+```
+
+```{r, include=FALSE}
 Data$predicted_probabilities = NULL # We drop the column of predicted probabilities since it is now useless
 
 
@@ -387,7 +435,7 @@ Also, the plot shows different slopes for males and females, hinting at a varyin
 
 # 4 KNN
 
-Using set.seed(123) guarantees that anyone rerunning the analysis will get the same results, making our work reproducible and reliable. It's essential for any steps that involve random choices, like dividing data into training and test sets.
+Using set.seed() guarantees that anyone rerunning the analysis will get the same results, making our work reproducible and reliable. It's essential for any steps that involve random choices, like dividing data into training and test sets.
 
 ```{r}
 # Seed setting
@@ -404,34 +452,33 @@ val_data <- Data[-id_train,]
 
 ```
 
-```{r}
+```{r, echo=FALSE}
 
 # Response variable distribution in the original data
 cat("Distribution of the target variable in the original set:\n")
-cat("Counts:\n")
+cat("Counts:")
 print(table(Data$Closed_Account))
-cat("\nProportions:\n")
+cat("Proportions:")
 print(prop.table(table(Data$Closed_Account)))
 cat("\n")
 
 # Response variable distribution in the train test
 cat("Distribution of the target variable in the train set:\n")
-cat("Counts:\n")
+cat("Counts:")
 print(table(train_data$Closed_Account))
-cat("\nProportions:\n")
+cat("Proportions:")
 print(prop.table(table(train_data$Closed_Account)))
 cat("\n")
 
 # Response variable distribution in the validation set
 cat("Distribution of the target variable in the validation set:\n")
-cat("Counts:\n")
+cat("Counts:")
 print(table(val_data$Closed_Account))
-cat("\nProportions:\n")
+cat("Proportions:")
 print(prop.table(table(val_data$Closed_Account)))
-cat("\n")
+
 
 ```
-
 
 In this scenario, the distribution of the target variable is quite similar across the different sets.
 
@@ -440,7 +487,7 @@ Initially, in order to find the best number of neighbors k to use in k-NN, we in
 As a second step, the model was trained with all the different hyper parameters in the range and the associated accuracy and sensitivity obtained on the validation set were stored. 
 * In order to compute the sensitivity we used a code chunk that is not visible in the report.
 
-```{r}
+```{r, include=FALSE}
 
 calculate_sensitivity <- function(true_values, predictions) {
   true_positives <- sum(true_values == 1 & predictions == 1)
@@ -457,7 +504,7 @@ sensitivity_scores <- numeric(length(k_values))
 
 # Loop over k values
 for (k in k_values) {
-  set.seed(123) # for reproducibility
+  set.seed(100) # for reproducibility
   knn_pred <- knn(train = train_data[, c("Total_Trans_Amt", "Total_Trans_Ct")],
                   test = val_data[, c("Total_Trans_Amt", "Total_Trans_Ct")],
                   cl = train_data$Closed_Account,
@@ -472,20 +519,21 @@ for (k in k_values) {
 
 We can now plot and comment the result
 
-```{r}
+```{r, echo=FALSE}
 # Plot the accuracy scores as a function of k
 plot(k_values, accuracy_scores, type = "b", 
      xlab = "Number of Neighbors (k)", ylab = "Accuracy",
      main = "k-NN Model Accuracy by Number of Neighbors")
 ```
 
-```{r}
+```{r, echo=FALSE}
 # Plot the accuracy scores as a function of k
 plot(k_values, sensitivity_scores, type = "b", 
      xlab = "Number of Neighbors (k)", ylab = "Sensitivity",
      main = "k-NN Model Sensitivity by Number of Neighbors")
 ```
-```{r}
+
+```{r, echo=FALSE}
 
 # For accuracy
 best_accuracy_k <- which.max(accuracy_scores)
@@ -510,7 +558,7 @@ cat("The second-best number of neighbors for sensitivity is:", second_best_sensi
     "with a sensitivity of:", max(sensitivity_scores, na.rm = TRUE), "\n")
 
 ```
-Given the high imbalance in our dataset, we've prioritized sensitivity in our selection criteria because minimizing false negatives—thus reducing missed positives—is crucial for our analysis. Especially in a banking context, identifying a false positive (predicting a customer will leave who doesn't) is preferable to overlooking a false negative (failing to predict a customer's departure).  Therefore, we've chosen 12 as the optimal value for k, reflecting the second-highest sensitivity, which remains a priority for us. This choice also maintains a strong performance in terms of accuracy, balancing our need to accurately predict customer behavior while minimizing the risk of overlooking potential churn.
+Given the high imbalance in our dataset, we've prioritized sensitivity in our selection criteria because minimizing false negatives—thus reducing missed positives—is crucial for our analysis. Especially in a banking context, identifying a false positive (predicting a customer will leave who doesn't) is preferable to overlooking a false negative (failing to predict a customer's departure). Therefore, the plot suggests selecting the best k value based on sensitivity, which is our priority. Yet, the optimal choice likely involves balancing sensitivity with accuracy, favoring the former without disregarding the latter.
 
 # 5 Best Model Selection
 
@@ -552,7 +600,7 @@ Despite the previous significant results, the model currently includes many vari
 ### Stepwise variable selection (based on AIC) 
 
 Forward selection: 
-```{r, echo=FALSE, message=FALSE, warning=FALSE}
+```{r, message=FALSE, warning=FALSE, results='hide'}
 # Forward
 logit_fit_aic1 <- step(glm(Closed_Account ~ 1,
                            family = "binomial",
@@ -565,7 +613,7 @@ The variable excluded by the forward selection, which obtains the best (least va
 Income, Customer_Age, Months_on_book, Avg_Open_To_Buy, Credit_Limit, Avg_Utilization_Ratio, Card_Category and Gender.
 
 Backward selection:
-```{r, echo=FALSE, message=FALSE, warning=FALSE}
+```{r, message=FALSE, warning=FALSE, results='hide'}
 # Backward
 logit_fit_aic2 <- step(logit_fit_baseline,
                        direction = "backward") 
@@ -577,7 +625,7 @@ Income, Customer_Age, Months_on_book, Avg_Open_To_Buy, Credit_Limit, Avg_Utiliza
 In this case, the two selection process eliminates the same variable and obtain the same AIC score.
 
 Both directions:
-```{r, echo=FALSE, message=FALSE, warning=FALSE}
+```{r, message=FALSE, warning=FALSE, results='hide'}
 # Both directions
 logit_fit_aic3 <- step(logit_fit_baseline,
                        direction = "both")
@@ -588,7 +636,7 @@ Income, Customer_Age, Months_on_book, Avg_Open_To_Buy, Credit_Limit, Avg_Utiliza
 
 As a general principle, in order to select the best model, we identify the one with the lowest number of covariates:
 
-```{r, echo=FALSE, message=FALSE, warning=FALSE}
+```{r, warning=FALSE}
 
 print(length(coefficients(logit_fit_aic1)))
 print(length(coefficients(logit_fit_aic2)))
@@ -601,7 +649,7 @@ However, in this specific case, every procedure basing on AIC gives the best (le
 ### Stepwise variable selection (based on BIC) 
 
 Forward selection: 
-```{r, echo=FALSE, message=FALSE, warning=FALSE}
+```{r, message=FALSE, warning=FALSE, results='hide'}
 
 # Forward
 logit_fit_bic1 <- step(glm(Closed_Account ~ 1,
@@ -616,7 +664,7 @@ The variables excluded by the forward selection, which obtains the best (least v
 Income, Customer_Age, Months_on_book, Avg_Open_To_Buy, Credit_Limit, Avg_Utilization_Ratio, Card_Category and Educational_Level. The result is really similar to the one obtained in the selection based on aic, except for the fact that Educational Level is excluded instead of Gender.
 
 Backward selection:
-```{r, echo=FALSE, message=FALSE, warning=FALSE}
+```{r, message=FALSE, warning=FALSE, results='hide'}
 # Backward
 logit_fit_bic2 <- step(logit_fit_baseline,
                        direction = "backward",
@@ -628,7 +676,7 @@ The variable excluded by the backward selection, which obtains the best (least v
 Income, Customer_Age, Months_on_book, Avg_Open_To_Buy, Credit_Limit, Avg_Utilization_Ratio, Card_Category and Educational_Level.
 
 Both directions:
-```{r, echo=FALSE, message=FALSE, warning=FALSE}
+```{r, message=FALSE, warning=FALSE, results='hide'}
 # Both directions
 logit_fit_bic3 <- step(logit_fit_baseline,
                        direction = "both",
@@ -644,7 +692,7 @@ Also in this case, every procedure basing on BIC gives the best (lest) AIC score
 
 To conduct a Principal Component Analysis (PCA), it's essential to focus solely on numerical variables from the training data. Given the importance of the covariance matrix's scale in PCA, implementing a scaling procedure is crucial to ensure meaningful analysis and results.
 
-```{r, message=FALSE}
+```{r, message=FALSE, results='hide'}
 
 # Selecting Numerical DF
 train_data_Numerical = train_data[numerical_variables] 
@@ -660,7 +708,7 @@ cov(train_data_Numerical_Scaled)
 
 The PCA is then executed on the pre-scaled numerical training data. After this, we compute the variance explained by each principal component both in absolute terms and as a percentage of the total variance. This helps in understanding the importance of each principal component in explaining the variation in the data.
 
-```{r, warning=FALSE, message=FALSE}
+```{r, message=FALSE, results='hide'}
 
 pca <- princomp(train_data_Numerical_Scaled, cor = T, scale = F) #already scaled
 
@@ -727,7 +775,9 @@ pca_data <- predict(pca, train_data_Numerical_Scaled)
 pca_data <- pca_data[, 1:11]
 
 
-logit_pca = glm(Closed_Account ~ ., data = data.frame(pca_data, Closed_Account = train_data$Closed_Account), 
+logit_pca = glm(Closed_Account ~ ., 
+                data = data.frame(pca_data, 
+                                  Closed_Account = train_data$Closed_Account), 
                 family = "binomial")
 
 ```
@@ -841,7 +891,7 @@ roc_out_bic1 <- pROC::roc(val_data$Closed_Account,
 ## Now let's take the best model and fit in the test dataset...
 
 ```{r}
-TestData = read.csv2("C:/Users/Thebrickster21/Desktop/DataAnalProject/bank_accounts_test.csv", 
+TestData = read.csv2("./Dataset/bank_accounts_test.csv", 
                  header = T, 
                  sep = ",", 
                  colClasses = "character")
