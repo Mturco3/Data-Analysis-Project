@@ -1,6 +1,6 @@
 ---
 title: "Data Analysis for Business Project"
-author: "Michele Turco"
+author: "STATBIZ"
 date: "2024-04-09"
 output:
   pdf_document: default
@@ -721,7 +721,7 @@ cov(train_data_Numerical_Scaled)
 
 The PCA is then executed on the pre-scaled numerical training data. After this, we compute the variance explained by each principal component both in absolute terms and as a percentage of the total variance. This helps in understanding the importance of each principal component in explaining the variation in the data.
 
-```{r, warning=False, message=FALSE, results='hide'}
+```{r, warning=FALSE, message=FALSE, results='hide'}
 
 pca <- princomp(train_data_Numerical_Scaled, cor = T, scale = F) #already scaled
 
@@ -781,15 +781,17 @@ Hence, we proceed in building our model:
 val_data_Numerical = val_data[numerical_variables] 
 val_data_Numerical_Scaled= scale(val_data_Numerical)
 
-# Predicting scores for the validation set using the PCA model
-pca_data <- predict(pca, train_data_Numerical_Scaled)
+# Predicting scores for the validation and test set using the PCA model
+pca_data_train <- predict(pca, train_data_Numerical_Scaled)
+pca_data_val <- predict(pca, val_data_Numerical_Scaled)
 
 # Selecting the first 11 principal components
-pca_data <- pca_data[, 1:11]
+pca_data_train <- pca_data_train[, 1:11]
+pca_data_val <- pca_data_val[, 1:11]
 
 
 logit_pca = glm(Closed_Account ~ ., 
-                data = data.frame(pca_data, 
+                data = data.frame(pca_data_train, 
                                   Closed_Account = train_data$Closed_Account), 
                 family = "binomial")
 
@@ -837,25 +839,14 @@ roc_pca <- pROC::roc(train_data$Closed_Account,
 ```
 On the train_set, the two models have the same ROC curve with the same AUC=0.918. Even if this is a good result, the models need to be tested on a dataset on which they have not been trained on (validation set).
 
-We can then apply the same procedure to the PCA model:
-```{r, warning=FALSE, echo=FALSE}
-
-roc_pca <- pROC::roc(train_data$Closed_Account,
-                     logit_pca$fitted.values,
-                     plot = TRUE,
-                     col = "red",
-                     lwd = 3,
-                     auc.polygon = T,
-                     auc.polygon.col = "deepskyblue",
-                     print.auc = T)
-
-
-```
-On the train_set, the models has AUC=0.866, yelding a result that is not as optimal as the one obtained with the process of variable selection.
+The PCA model, on the other hand, has AUC=0.866, yielding a result that is not as optimal as the one obtained with the process of variable selection.
 
 ###  Models testing on the validation set
 
-```{r, echo=FALSE, warning=FALSE}
+The following step is to compute the AUC metric on the validation set.
+
+```{r, warning=FALSE}
+
 ## Validation set ##
 
 #threshold
@@ -874,6 +865,18 @@ prob_out_bic1 <- predict(logit_fit_bic1,
                         type = "response")
 pred_out_bic1 <- as.factor(ifelse(prob_out_bic1 > tt, "yes", "no"))
 
+
+pca_data_val_df <- data.frame(pca_data_val) # A dataframe is needed as parameter
+prob_out_pca <- predict(logit_pca,
+                        newdata = pca_data_val_df,
+                        type = "response")
+
+
+pred_out_pca <- as.factor(ifelse(prob_out_pca > tt, "yes", "no"))
+
+```
+
+```{r, echo=FALSE, warning=FALSE}
 
 # ROC curves
 roc_out_aic1 <- pROC::roc(val_data$Closed_Account,
@@ -895,7 +898,7 @@ roc_out_bic1 <- pROC::roc(val_data$Closed_Account,
                           print.auc = T)
 
 roc_out_pca <- pROC::roc(val_data$Closed_Account,
-                          prob_out_bic1,
+                          prob_out_pca,
                           plot = TRUE,
                           col = "lightgreen",
                           lwd = 3,
@@ -904,18 +907,30 @@ roc_out_pca <- pROC::roc(val_data$Closed_Account,
                           print.auc = T)
 
 
-
 ```
-The model shows a slightly reduced performance on the validation compared with the test set, which is a common occurrence in predictive modeling. However, this minor difference is not significant and points out model's strong generalization capabilities. Such generalization is crucial since it means the model doesn't just memorize the training data, but it rather learns the underlying patterns, enabling it to maintain accuracy when applied to new datasets. A significant performance drop on the validation set would signal overfitting, while the close performance metrics between the two sets in this case suggest that the model has achieved a desirable balance, neither overfitting nor underfitting. It is then capable ofproviding with consistent predictions on both familiar and unfamiliar data.
+The model shows a slightly reduced performance on the validation compared with the test set, which is a common occurrence in predictive modeling. However, this minor difference is not significant and points out model's strong generalization capabilities. Such generalization is crucial since it means the model doesn't just memorize the training data, but it rather learns the underlying patterns, enabling it to maintain accuracy when applied to new datasets. A significant performance drop on the validation set would signal overfitting, while the close performance metrics between the two sets in this case suggest that the model has achieved a desirable balance, neither overfitting nor underfitting. It is then capable of providing with consistent predictions on both familiar and unfamiliar data.
 
-## Now let's take the best model and fit in the test dataset...
+The same line of reasoning also works for the PCA model. The performance is still smaller than the models obtained trough variable selection. Our best model is hence the one found with aic.
 
+```{r}
+best_model = logit_fit_aic1
+```
+
+## Test Dataset predictions
+
+### Import Dataset
 ```{r}
 TestData = read.csv2("./Dataset/bank_accounts_test.csv", 
                  header = T, 
                  sep = ",", 
                  colClasses = "character")
+```
 
+### Preprocessing on Test Dataset
+
+We need to remove the Unknown values in the same way we have done for the training set.
+
+```{r}
 #Encode NaN values
 #Rename missing values with NA notation
 TestData[TestData == 'Unknown'] <- NA
@@ -934,9 +949,15 @@ for (var in numerical_variables) {
 for (var in categorical_variables) {
   TestData[[var]] = as.factor(TestData[[var]])
 }
+```
 
 # Predictions for the observations in the Test set
-predicted_prob <- predict(logit_fit_aic2,
+
+We then compute the probabilities for our best model and we write them into the csv file in order to store them.
+
+```{r}
+
+predicted_prob <- predict(best_model,
                         newdata = TestData,
                         type = "response")
 
@@ -946,29 +967,11 @@ head(predicted_prob)
 write.csv(predicted_prob, "my_prob.csv", row.names = F)
 
 ```
-In our case, we focus on sensitivity because it's critical for the bank to
-capture as many true positives (actual account closures) as possible. 
-High sensitivity ensures the bank can proactively retain these customers, 
-avoiding a potential loss for each customer who leaves.
-•	Threshold of 0.5 yields decent accuracy but falls short in maximizing 
-financial gain due to moderate sensitivity.
-•	Threshold of 0.2 boosts sensitivity, catching more customers who might leave, 
-but also increases false positives, where offers are made to customers who would
-stay regardless.
-•	Threshold of 0.8 sharply decreases sensitivity, reducing potential gains 
-significantly.
-•	Threshold of 0.28 strikes the best balance, leading to the highest financial 
-gain by achieving a good balance between sensitivity and precision.
-
-The ROC curve and the AUC value of 0.916 confirm the model's strong 
-discriminative ability. The curve well above the baseline indicates a good 
-separation between the true positive and false positive rates across various 
-thresholds, affirming the reliability of the model in differentiating between 
-the customers who will close their accounts and those who will not.
-
 # 6 TRESHOLD CHOICE
 
-```{r, echo=FALSE, warning=FALSE}
+First of all, a set of thresholds will be used to perform a greedy search for the optimal value. Then, the function calculate_metrics is set up to apply each threshold to the model's predicted probabilities. For each threshold, it calculates the predicted binary outcomes (1 for event occurrence, 0 for non-occurrence) and constructs a confusion matrix to tabulate the true positives, true negatives, false positives, and false negatives.
+The function performance metrics computes in addittion key performance metrics such as accuracy, precision, recall (sensitivity), and F1 score to evaluate the model's performance at each threshold.
+```{r, warning=FALSE}
 # Thresholds choices
 thresholds <- c(0.5, 0.2, 0.8, 0.28) 
 
@@ -1005,53 +1008,28 @@ cat("Threshold: ", tt, "\n",
     "Recall (Sensitivity): ", recall, "\n",
     "F1 Score: ", F1_score, "\n\n")
 }
+```
+
+We can then shows the result and comment them:
+
+```{r, warning=FALSE}
 
 # Calculate metrics for each threshold
 for (tt in thresholds) {
   calculate_metrics(tt)
 }
 
-# Calculate the ROC curve
-roc <- roc(response =val_data$Closed_Account,
-           predictor = predict(logit_fit_bic1,
-                               newdata = val_data, type = "response"), 
-           levels = c("0", "1"))
-auc_value <- auc(roc)
-print(paste("AUC:", auc_value))
-
-# Create a data frame from the roc object for plotting
-roc_data <- data.frame(
-  TPR = roc$sensitivities,
-  FPR = roc$specificities,
-  Thresholds = roc$thresholds
-)
-
-# Plot the ROC curve
-ggplot(roc_data, aes(x = 1 - FPR, y = TPR)) + 
-  geom_line(color = "#1c61b6", size = 1) +
-  geom_area(fill = "#1c61b624") +
-  geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = "red") +
-  annotate("text", x = 0.8, y = 0.2, label = paste("AUC:", round(auc_value, 3)),
-           hjust = 0, color = "#1c61b6") +
-  theme_minimal() +
-  labs(
-    title = "ROC Curve",
-    x = "1 - Specificity (False Positive Rate)",
-    y = "Sensitivity (True Positive Rate)"
-  ) +
-  theme(plot.title = element_text(hjust = 0.5), legend.position = "none")
 ```
-
 In our case, we focus on sensitivity because it's critical for the bank to
 capture as many true positives (actual account closures) as possible. 
 High sensitivity ensures the bank can proactively retain these customers, 
 avoiding a potential loss for each customer who leaves.
-•	Threshold of 0.5 yields decent accuracy but falls short in maximizing 
+Threshold of 0.5 yields decent accuracy but falls short in maximizing 
 financial gain due to moderate sensitivity.
-•	Threshold of 0.2 boosts sensitivity, catching more customers who might leave, 
+Threshold of 0.2 boosts sensitivity, catching more customers who might leave, 
 but also increases false positives, where offers are made to customers who would
 stay regardless.
-•	Threshold of 0.8 sharply decreases sensitivity, reducing potential gains 
+Threshold of 0.8 sharply decreases sensitivity, reducing potential gains 
 significantly.
-•	Threshold of 0.28 strikes the best balance, leading to the highest financial 
-gain by achieving a good balance between sensitivity and precision.
+Threshold of 0.28 strikes the best balance, leading to the highest financial 
+gain by achieving a good balance between sensitivity and precision and is hence the optimal solution.
